@@ -1,7 +1,9 @@
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:sahana/core/services/auth_service.dart';
 import 'package:sahana/core/theme/app_colors.dart';
 import 'package:sahana/features/auth/screens/beneficiary_registration_screen.dart';
+import 'package:sahana/features/dashboard/screens/beneficiary_dashboard.dart';
 
 class BeneficiaryLoginScreen extends StatefulWidget {
   const BeneficiaryLoginScreen({super.key});
@@ -25,17 +27,35 @@ class _BeneficiaryLoginScreenState extends State<BeneficiaryLoginScreen> {
       final userCredential = await _authService.signInWithGoogle();
       if (userCredential != null) {
         if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('Signed in successfully!')),
-          );
+          // Check if user exists in Firestore
+          final userDoc = await FirebaseFirestore.instance
+              .collection('users')
+              .doc(userCredential.user!.uid)
+              .get();
 
-          // Navigate to Registration Screen
-          Navigator.pushReplacement(
-            context,
-            MaterialPageRoute(
-              builder: (context) => const BeneficiaryRegistrationScreen(),
-            ),
-          );
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(content: Text('Signed in successfully!')),
+            );
+
+            if (userDoc.exists) {
+              // User exists, go to Dashboard
+              Navigator.pushReplacement(
+                context,
+                MaterialPageRoute(
+                  builder: (context) => const BeneficiaryDashboard(),
+                ),
+              );
+            } else {
+              // New user, go to Registration
+              Navigator.pushReplacement(
+                context,
+                MaterialPageRoute(
+                  builder: (context) => const BeneficiaryRegistrationScreen(),
+                ),
+              );
+            }
+          }
         }
       }
     } catch (e) {
