@@ -1,4 +1,8 @@
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
+import 'package:geocoding/geocoding.dart';
+import 'package:geolocator/geolocator.dart';
 import 'package:sahana/core/theme/app_colors.dart';
 
 class CreateRequestScreen extends StatefulWidget {
@@ -15,6 +19,9 @@ class _CreateRequestScreenState extends State<CreateRequestScreen> {
   final TextEditingController _familySizeController = TextEditingController(
     text: '4',
   );
+  bool _isLoading = false;
+  GeoPoint? _currentLocation;
+  String _locationText = 'Fetching location...';
 
   final List<Map<String, dynamic>> _categories = [
     {'name': 'Food Package', 'icon': Icons.inventory_2_outlined},
@@ -26,6 +33,177 @@ class _CreateRequestScreenState extends State<CreateRequestScreen> {
   ];
 
   final List<String> _urgencyLevels = ['Low', 'Medium', 'High', 'Critical'];
+
+  @override
+  void initState() {
+    super.initState();
+    _fetchUserLocation();
+  }
+
+  Future<void> _getAddressFromLatLng(GeoPoint point) async {
+    try {
+      List<Placemark> placemarks = await placemarkFromCoordinates(
+        point.latitude,
+        point.longitude,
+      );
+
+      if (placemarks.isNotEmpty) {
+        Placemark place = placemarks[0];
+        setState(() {
+          // Construct a readable address
+          // e.g. "No 123, Galle Road, Colombo 03, Western Province"
+          List<String> addressParts = [];
+          if (place.street != null) addressParts.add(place.street!);
+          if (place.subLocality != null) addressParts.add(place.subLocality!);
+          if (place.locality != null) addressParts.add(place.locality!);
+          if (place.administrativeArea != null)
+            addressParts.add(place.administrativeArea!);
+
+          _locationText = addressParts.join(', ');
+        });
+      } else {
+        setState(() {
+          _locationText =
+              'Lat: ${point.latitude.toStringAsFixed(4)}, Lng: ${point.longitude.toStringAsFixed(4)}';
+        });
+      }
+    } catch (e) {
+      setState(() {
+        _locationText =
+            'Lat: ${point.latitude.toStringAsFixed(4)}, Lng: ${point.longitude.toStringAsFixed(4)}';
+      });
+    }
+  }
+
+  Future<void> _fetchUserLocation() async {
+    try {
+      final user = FirebaseAuth.instance.currentUser;
+      if (user != null) {
+        final doc = await FirebaseFirestore.instance
+            .collection('users')
+            .doc(user.uid)
+            .get();
+        if (doc.exists && doc.data() != null) {
+          final data = doc.data()!;
+          if (data.containsKey('location')) {
+            final geoPoint = data['location'] as GeoPoint;
+            setState(() {
+              _currentLocation = geoPoint;
+            });
+            _getAddressFromLatLng(geoPoint);
+          } else {
+            setState(() {
+              _locationText = 'Location not found. Please update.';
+            });
+          }
+        }
+      }
+    } catch (e) {
+      setState(() {
+        _locationText = 'Error fetching location';
+      });
+    }
+  }
+
+  Future<void> _updateLocation() async {
+    setState(() {
+      _locationText = 'Updating location...';
+    });
+    try {
+      LocationPermission permission = await Geolocator.checkPermission();
+      if (permission == LocationPermission.denied) {
+        permission = await Geolocator.requestPermission();
+        if (permission == LocationPermission.denied) {
+          setState(() {
+            _locationText = 'Location permission denied';
+          });
+          return;
+        }
+      }
+
+      if (permission == LocationPermission.deniedForever) {
+        setState(() {
+          _locationText = 'Location permission permanently denied';
+        });
+        return;
+      }
+
+      final position = await Geolocator.getCurrentPosition();
+      final geoPoint = GeoPoint(position.latitude, position.longitude);
+
+      setState(() {
+        _currentLocation = geoPoint;
+      });
+
+      await _getAddressFromLatLng(geoPoint);
+    } catch (e) {
+      setState(() {
+        _locationText = 'Error updating location';
+      });
+    }
+  }
+
+  Future<void> _submitRequest() async {
+    if (_selectedCategory == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Please select a request type')),
+      );
+      return;
+    }
+    if (_descriptionController.text.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Please enter a description')),
+      );
+      return;
+    }
+    if (_currentLocation == null) {
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('Location is required')));
+      return;
+    }
+
+    setState(() {
+      _isLoading = true;
+    });
+
+    try {
+      final user = FirebaseAuth.instance.currentUser;
+      if (user != null) {
+        await FirebaseFirestore.instance.collection('requests').add({
+          'userId': user.uid,
+          'category': _selectedCategory,
+          'description': _descriptionController.text,
+          'urgency': _urgencyLevel,
+          'familySize': int.tryParse(_familySizeController.text) ?? 1,
+          'location': _currentLocation,
+          'status': 'Pending',
+          'createdAt': FieldValue.serverTimestamp(),
+          'userName': user.displayName ?? 'Unknown',
+          'address': _locationText, // Save the address text too
+        });
+
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Request submitted successfully!')),
+          );
+          Navigator.pop(context); // Go back to dashboard
+        }
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('Error submitting request: $e')));
+      }
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isLoading = false;
+        });
+      }
+    }
+  }
 
   @override
   void dispose() {
@@ -291,17 +469,20 @@ class _CreateRequestScreenState extends State<CreateRequestScreen> {
                           ],
                         ),
                         const SizedBox(height: 8),
-                        const Text(
-                          'Colombo 07, Sri Lanka', // Placeholder
-                          style: TextStyle(color: AppColors.textDark),
+                        Text(
+                          _locationText,
+                          style: const TextStyle(color: AppColors.textDark),
                         ),
                         const SizedBox(height: 8),
-                        Text(
-                          'Update Location',
-                          style: TextStyle(
-                            color: AppColors.primaryBlue,
-                            fontWeight: FontWeight.bold,
-                            decoration: TextDecoration.underline,
+                        InkWell(
+                          onTap: _updateLocation,
+                          child: Text(
+                            'Update Location',
+                            style: TextStyle(
+                              color: AppColors.primaryBlue,
+                              fontWeight: FontWeight.bold,
+                              decoration: TextDecoration.underline,
+                            ),
                           ),
                         ),
                       ],
@@ -357,9 +538,7 @@ class _CreateRequestScreenState extends State<CreateRequestScreen> {
                     width: double.infinity,
                     height: 56,
                     child: ElevatedButton(
-                      onPressed: () {
-                        // TODO: Submit Request
-                      },
+                      onPressed: _isLoading ? null : _submitRequest,
                       style: ElevatedButton.styleFrom(
                         backgroundColor: const Color(
                           0xFF6EE7B7,
@@ -370,13 +549,15 @@ class _CreateRequestScreenState extends State<CreateRequestScreen> {
                         ),
                         elevation: 0,
                       ),
-                      child: const Text(
-                        'Submit Request',
-                        style: TextStyle(
-                          fontSize: 18,
-                          fontWeight: FontWeight.bold,
-                        ),
-                      ),
+                      child: _isLoading
+                          ? const CircularProgressIndicator(color: Colors.white)
+                          : const Text(
+                              'Submit Request',
+                              style: TextStyle(
+                                fontSize: 18,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
                     ),
                   ),
                   const SizedBox(height: 32),
