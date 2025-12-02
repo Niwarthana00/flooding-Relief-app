@@ -1,0 +1,39 @@
+{
+  "project_info": {
+    "project_number": "1019170524482",
+    "project_id": "sahana-9babf",
+    "storage_bucket": "sahana-9babf.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:1019170524482:android:6923b537f7a0927806ccdb",
+        "android_client_info": {
+          "package_name": "com.example.sahana"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "1019170524482-2jp5ules854drq2mohlsgb12p1dtuenc.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyC6mMXCaE_tF5BM4oHenSFsCkY_9HX66p4"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "1019170524482-2jp5ules854drq2mohlsgb12p1dtuenc.apps.googleusercontent.com",
+              "client_type": 3
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
