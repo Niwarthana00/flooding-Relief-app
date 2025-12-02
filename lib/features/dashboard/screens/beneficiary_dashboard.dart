@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:sahana/core/theme/app_colors.dart';
 import 'package:sahana/core/services/auth_service.dart';
 import 'package:sahana/features/auth/screens/role_selection_screen.dart';
+import 'package:sahana/features/requests/screens/create_request_screen.dart';
 
 class BeneficiaryDashboard extends StatefulWidget {
   const BeneficiaryDashboard({super.key});
@@ -237,7 +238,12 @@ class _HomeTab extends StatelessWidget {
                   height: 56,
                   child: ElevatedButton.icon(
                     onPressed: () {
-                      // TODO: Navigate to Create Request
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (context) => const CreateRequestScreen(),
+                        ),
+                      );
                     },
                     icon: const Icon(Icons.add),
                     label: const Text(
