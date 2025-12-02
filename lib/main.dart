@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:sahana/core/theme/app_colors.dart';
-import 'package:sahana/features/auth/screens/role_selection_screen.dart';
+import 'package:sahana/features/auth/screens/auth_wrapper.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -22,7 +22,7 @@ class MyApp extends StatelessWidget {
         useMaterial3: true,
         scaffoldBackgroundColor: AppColors.background,
       ),
-      home: const RoleSelectionScreen(),
+      home: const AuthWrapper(),
     );
   }
 }
