@@ -22,6 +22,7 @@ class _CreateRequestScreenState extends State<CreateRequestScreen> {
   bool _isLoading = false;
   GeoPoint? _currentLocation;
   String _locationText = 'Fetching location...';
+  String? _userDistrict;
 
   final List<Map<String, dynamic>> _categories = [
     {'name': 'Food Package', 'icon': Icons.inventory_2_outlined},
@@ -85,6 +86,11 @@ class _CreateRequestScreenState extends State<CreateRequestScreen> {
             .get();
         if (doc.exists && doc.data() != null) {
           final data = doc.data()!;
+          if (mounted) {
+            setState(() {
+              _userDistrict = data['district'] as String?;
+            });
+          }
           if (data.containsKey('location')) {
             final geoPoint = data['location'] as GeoPoint;
             setState(() {
@@ -181,6 +187,7 @@ class _CreateRequestScreenState extends State<CreateRequestScreen> {
           'createdAt': FieldValue.serverTimestamp(),
           'userName': user.displayName ?? 'Unknown',
           'address': _locationText, // Save the address text too
+          'district': _userDistrict,
         });
 
         if (mounted) {

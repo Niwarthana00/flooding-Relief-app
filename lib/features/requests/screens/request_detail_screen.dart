@@ -1,4 +1,5 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:sahana/core/theme/app_colors.dart';
 import 'package:sahana/features/requests/screens/tracking_screen.dart';
@@ -76,7 +77,14 @@ class RequestDetailScreen extends StatelessWidget {
             if (['assigned', 'arriving'].contains(status.toLowerCase()))
               _buildTrackLocationButton(context, location),
 
-            if (['assigned', 'arriving'].contains(status.toLowerCase()))
+            // Accept Button (Only if pending)
+            if (status.toLowerCase() == 'pending') _buildAcceptButton(context),
+
+            if ([
+              'assigned',
+              'arriving',
+              'pending',
+            ].contains(status.toLowerCase()))
               const SizedBox(height: 16),
 
             // Request Details Card
@@ -331,6 +339,55 @@ class RequestDetailScreen extends StatelessWidget {
         label: const Text('Track Live Location'),
         style: ElevatedButton.styleFrom(
           backgroundColor: const Color(0xFF10B981),
+          foregroundColor: Colors.white,
+          padding: const EdgeInsets.symmetric(vertical: 16),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(12),
+          ),
+          elevation: 2,
+        ),
+      ),
+    );
+  }
+
+  Widget _buildAcceptButton(BuildContext context) {
+    return SizedBox(
+      width: double.infinity,
+      child: ElevatedButton.icon(
+        onPressed: () async {
+          // TODO: Ideally move this to a service or provider
+          try {
+            final user = FirebaseAuth.instance.currentUser;
+            if (user != null) {
+              await FirebaseFirestore.instance
+                  .collection('requests')
+                  .doc(requestId)
+                  .update({
+                    'status': 'assigned',
+                    'volunteerId': user.uid,
+                    'volunteerName': user.displayName ?? 'Volunteer',
+                    'volunteerPhone':
+                        user.phoneNumber ?? '', // Or fetch from user doc
+                  });
+              if (context.mounted) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(content: Text('Request Accepted!')),
+                );
+                Navigator.pop(context);
+              }
+            }
+          } catch (e) {
+            if (context.mounted) {
+              ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(content: Text('Error accepting request: $e')),
+              );
+            }
+          }
+        },
+        icon: const Icon(Icons.check_circle_outline),
+        label: const Text('Accept Request'),
+        style: ElevatedButton.styleFrom(
+          backgroundColor: AppColors.primaryBlue,
           foregroundColor: Colors.white,
           padding: const EdgeInsets.symmetric(vertical: 16),
           shape: RoundedRectangleBorder(
