@@ -427,6 +427,7 @@ class _CreateRequestScreenState extends State<CreateRequestScreen> {
                     controller: _familySizeController,
                     keyboardType: TextInputType.number,
                     decoration: InputDecoration(
+                      hintText: 'Enter number of family members',
                       filled: true,
                       fillColor: Colors.white,
                       border: OutlineInputBorder(
@@ -488,49 +489,7 @@ class _CreateRequestScreenState extends State<CreateRequestScreen> {
                       ],
                     ),
                   ),
-                  const SizedBox(height: 24),
-
-                  // Daily Limit Warning
-                  Container(
-                    padding: const EdgeInsets.all(16),
-                    decoration: BoxDecoration(
-                      color: const Color(0xFFFFFBEB), // Light yellow bg
-                      borderRadius: BorderRadius.circular(12),
-                      border: Border.all(color: const Color(0xFFFCD34D)),
-                    ),
-                    child: Row(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        const Icon(
-                          Icons.error_outline_rounded,
-                          color: Color(0xFFD97706),
-                        ),
-                        const SizedBox(width: 12),
-                        const Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(
-                                'Daily Limit',
-                                style: TextStyle(
-                                  color: Color(0xFF92400E),
-                                  fontWeight: FontWeight.bold,
-                                ),
-                              ),
-                              SizedBox(height: 4),
-                              Text(
-                                'You can submit one request per day. For emergencies, contact admin for approval.',
-                                style: TextStyle(
-                                  color: Color(0xFF92400E),
-                                  fontSize: 12,
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
+                  const SizedBox(height: 32),
                   const SizedBox(height: 32),
 
                   // Submit Button

@@ -1,11 +1,16 @@
+import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:firebase_storage/firebase_storage.dart';
 import 'package:geocoding/geocoding.dart';
+import 'package:geolocator/geolocator.dart';
+import 'package:image_picker/image_picker.dart';
 import 'package:sahana/core/theme/app_colors.dart';
 import 'package:sahana/core/services/auth_service.dart';
 import 'package:sahana/features/auth/screens/role_selection_screen.dart';
 import 'package:sahana/features/requests/screens/create_request_screen.dart';
+import 'package:sahana/features/requests/screens/request_detail_screen.dart';
 
 class BeneficiaryDashboard extends StatefulWidget {
   const BeneficiaryDashboard({super.key});
@@ -30,7 +35,7 @@ class _BeneficiaryDashboardState extends State<BeneficiaryDashboard> {
       body: _selectedIndex == 0
           ? const _HomeTab()
           : _selectedIndex == 1
-          ? const Center(child: Text("Requests"))
+          ? const _RequestsTab()
           : const _ProfileTab(),
       bottomNavigationBar: BottomNavigationBar(
         currentIndex: _selectedIndex,
@@ -67,6 +72,7 @@ class _HomeTab extends StatefulWidget {
 
 class _HomeTabState extends State<_HomeTab> {
   String _locationText = 'Loading location...';
+  bool _isUpdatingLocation = false;
 
   @override
   void initState() {
@@ -105,6 +111,57 @@ class _HomeTabState extends State<_HomeTab> {
     }
   }
 
+  Future<void> _updateLocation() async {
+    setState(() {
+      _isUpdatingLocation = true;
+      _locationText = 'Updating...';
+    });
+
+    try {
+      LocationPermission permission = await Geolocator.checkPermission();
+      if (permission == LocationPermission.denied) {
+        permission = await Geolocator.requestPermission();
+        if (permission == LocationPermission.denied) {
+          setState(() {
+            _locationText = 'Permission denied';
+            _isUpdatingLocation = false;
+          });
+          return;
+        }
+      }
+
+      if (permission == LocationPermission.deniedForever) {
+        setState(() {
+          _locationText = 'Permission permanently denied';
+          _isUpdatingLocation = false;
+        });
+        return;
+      }
+
+      final position = await Geolocator.getCurrentPosition();
+      final geoPoint = GeoPoint(position.latitude, position.longitude);
+      final user = FirebaseAuth.instance.currentUser;
+
+      if (user != null) {
+        await FirebaseFirestore.instance
+            .collection('users')
+            .doc(user.uid)
+            .update({'location': geoPoint});
+        await _getAddressFromLatLng(geoPoint);
+      }
+    } catch (e) {
+      setState(() {
+        _locationText = 'Error updating';
+      });
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isUpdatingLocation = false;
+        });
+      }
+    }
+  }
+
   Future<void> _getAddressFromLatLng(GeoPoint point) async {
     try {
       List<Placemark> placemarks = await placemarkFromCoordinates(
@@ -116,8 +173,7 @@ class _HomeTabState extends State<_HomeTab> {
         Placemark place = placemarks[0];
         if (mounted) {
           setState(() {
-            _locationText =
-                '${place.locality}, ${place.administrativeArea}'; // e.g., Colombo, Western Province
+            _locationText = '${place.locality}, ${place.administrativeArea}';
           });
         }
       }
@@ -222,326 +278,654 @@ class _HomeTabState extends State<_HomeTab> {
   @override
   Widget build(BuildContext context) {
     final user = FirebaseAuth.instance.currentUser;
-    final displayName = user?.displayName ?? 'Beneficiary';
-    final firstName = displayName.split(' ').first;
 
-    return StreamBuilder<QuerySnapshot>(
+    return StreamBuilder<DocumentSnapshot>(
       stream: FirebaseFirestore.instance
-          .collection('requests')
-          .where('userId', isEqualTo: user?.uid)
-          .orderBy('createdAt', descending: true)
+          .collection('users')
+          .doc(user?.uid)
           .snapshots(),
-      builder: (context, snapshot) {
-        if (snapshot.hasError) {
-          return Center(child: Text('Error: ${snapshot.error}'));
-        }
+      builder: (context, userSnapshot) {
+        final userData = userSnapshot.data?.data() as Map<String, dynamic>?;
+        final displayName =
+            userData?['name'] ?? user?.displayName ?? 'Beneficiary';
+        final firstName = displayName.split(' ').first;
+        final photoURL = userData?['photoURL'] ?? user?.photoURL;
 
-        if (snapshot.connectionState == ConnectionState.waiting) {
-          return const Center(child: CircularProgressIndicator());
-        }
+        return StreamBuilder<QuerySnapshot>(
+          stream: FirebaseFirestore.instance
+              .collection('requests')
+              .where('userId', isEqualTo: user?.uid)
+              .orderBy('createdAt', descending: true)
+              .snapshots(),
+          builder: (context, snapshot) {
+            if (snapshot.hasError) {
+              return Center(child: Text('Error: ${snapshot.error}'));
+            }
 
-        final docs = snapshot.data?.docs ?? [];
-        final activeRequests = docs.where((doc) {
-          final status = (doc['status'] as String).toLowerCase();
-          return [
-            'pending',
-            'approved',
-            'assigned',
-            'arriving',
-          ].contains(status);
-        }).toList();
+            if (snapshot.connectionState == ConnectionState.waiting) {
+              return const Center(child: CircularProgressIndicator());
+            }
 
-        final pastRequests = docs.where((doc) {
-          final status = (doc['status'] as String).toLowerCase();
-          return ['completed', 'rejected', 'cancelled'].contains(status);
-        }).toList();
+            final docs = snapshot.data?.docs ?? [];
+            final activeRequests = docs.where((doc) {
+              final status = (doc['status'] as String).toLowerCase();
+              return [
+                'pending',
+                'approved',
+                'assigned',
+                'arriving',
+              ].contains(status);
+            }).toList();
 
-        return SingleChildScrollView(
-          child: Column(
-            children: [
-              // Custom Header Section
-              Container(
-                padding: const EdgeInsets.fromLTRB(24, 60, 24, 30),
-                decoration: const BoxDecoration(
-                  color: AppColors.primaryGreen,
-                  borderRadius: BorderRadius.only(
-                    bottomLeft: Radius.circular(30),
-                    bottomRight: Radius.circular(30),
-                  ),
-                ),
-                child: Column(
-                  children: [
-                    // Top Row: Profile & Actions
-                    Row(
+            final pastRequests = docs.where((doc) {
+              final status = (doc['status'] as String).toLowerCase();
+              return ['completed', 'rejected', 'cancelled'].contains(status);
+            }).toList();
+
+            return SingleChildScrollView(
+              child: Column(
+                children: [
+                  // Custom Header Section
+                  Container(
+                    padding: const EdgeInsets.fromLTRB(24, 60, 24, 30),
+                    decoration: const BoxDecoration(
+                      color: AppColors.primaryGreen,
+                      borderRadius: BorderRadius.only(
+                        bottomLeft: Radius.circular(30),
+                        bottomRight: Radius.circular(30),
+                      ),
+                    ),
+                    child: Column(
                       children: [
-                        Container(
-                          padding: const EdgeInsets.all(2),
-                          decoration: BoxDecoration(
-                            shape: BoxShape.circle,
-                            border: Border.all(
-                              color: Colors.white.withOpacity(0.5),
-                              width: 2,
-                            ),
-                          ),
-                          child: CircleAvatar(
-                            radius: 24,
-                            backgroundColor: Colors.white24,
-                            backgroundImage: user?.photoURL != null
-                                ? NetworkImage(user!.photoURL!)
-                                : null,
-                            child: user?.photoURL == null
-                                ? const Icon(Icons.person, color: Colors.white)
-                                : null,
-                          ),
-                        ),
-                        const SizedBox(width: 12),
-                        Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(
-                                firstName,
-                                style: const TextStyle(
-                                  color: Colors.white,
-                                  fontSize: 20,
-                                  fontWeight: FontWeight.bold,
+                        // Top Row: Profile & Actions
+                        Row(
+                          children: [
+                            Container(
+                              padding: const EdgeInsets.all(2),
+                              decoration: BoxDecoration(
+                                shape: BoxShape.circle,
+                                border: Border.all(
+                                  color: Colors.white.withOpacity(0.5),
+                                  width: 2,
                                 ),
-                                maxLines: 1,
-                                overflow: TextOverflow.ellipsis,
                               ),
-                              const SizedBox(height: 4),
-                              Row(
+                              child: CircleAvatar(
+                                radius: 24,
+                                backgroundColor: Colors.white24,
+                                backgroundImage: photoURL != null
+                                    ? NetworkImage(photoURL)
+                                    : null,
+                                child: photoURL == null
+                                    ? const Icon(
+                                        Icons.person,
+                                        color: Colors.white,
+                                      )
+                                    : null,
+                              ),
+                            ),
+                            const SizedBox(width: 12),
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
                                 children: [
-                                  const Icon(
-                                    Icons.location_on,
-                                    color: Colors.white70,
-                                    size: 12,
+                                  Text(
+                                    firstName,
+                                    style: const TextStyle(
+                                      color: Colors.white,
+                                      fontSize: 20,
+                                      fontWeight: FontWeight.bold,
+                                    ),
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
                                   ),
-                                  const SizedBox(width: 4),
-                                  Expanded(
-                                    child: Text(
-                                      _locationText,
-                                      style: const TextStyle(
-                                        color: Colors.white70,
-                                        fontSize: 12,
-                                      ),
-                                      maxLines: 1,
-                                      overflow: TextOverflow.ellipsis,
+                                  const SizedBox(height: 4),
+                                  InkWell(
+                                    onTap: _isUpdatingLocation
+                                        ? null
+                                        : _updateLocation,
+                                    child: Row(
+                                      children: [
+                                        const Icon(
+                                          Icons.location_on,
+                                          color: Colors.white70,
+                                          size: 12,
+                                        ),
+                                        const SizedBox(width: 4),
+                                        Expanded(
+                                          child: Text(
+                                            _locationText,
+                                            style: const TextStyle(
+                                              color: Colors.white70,
+                                              fontSize: 12,
+                                              decoration:
+                                                  TextDecoration.underline,
+                                              decorationStyle:
+                                                  TextDecorationStyle.dotted,
+                                            ),
+                                            maxLines: 1,
+                                            overflow: TextOverflow.ellipsis,
+                                          ),
+                                        ),
+                                        if (_isUpdatingLocation)
+                                          const Padding(
+                                            padding: EdgeInsets.only(left: 4),
+                                            child: SizedBox(
+                                              width: 10,
+                                              height: 10,
+                                              child: CircularProgressIndicator(
+                                                strokeWidth: 2,
+                                                color: Colors.white,
+                                              ),
+                                            ),
+                                          )
+                                        else
+                                          const Icon(
+                                            Icons.refresh,
+                                            color: Colors.white70,
+                                            size: 12,
+                                          ),
+                                      ],
                                     ),
                                   ),
                                 ],
                               ),
-                            ],
-                          ),
+                            ),
+                            IconButton(
+                              onPressed: () {},
+                              icon: const Icon(
+                                Icons.notifications_outlined,
+                                color: Colors.white,
+                              ),
+                              style: IconButton.styleFrom(
+                                backgroundColor: Colors.white24,
+                                shape: const CircleBorder(),
+                              ),
+                            ),
+                            const SizedBox(width: 8),
+                            IconButton(
+                              onPressed: () async {
+                                await AuthService().signOut();
+                                if (context.mounted) {
+                                  Navigator.pushAndRemoveUntil(
+                                    context,
+                                    MaterialPageRoute(
+                                      builder: (_) =>
+                                          const RoleSelectionScreen(),
+                                    ),
+                                    (route) => false,
+                                  );
+                                }
+                              },
+                              icon: const Icon(
+                                Icons.logout_rounded,
+                                color: Colors.white,
+                              ),
+                              style: IconButton.styleFrom(
+                                backgroundColor: Colors.white24,
+                                shape: const CircleBorder(),
+                              ),
+                            ),
+                          ],
                         ),
-                        IconButton(
-                          onPressed: () {},
-                          icon: const Icon(
-                            Icons.notifications_outlined,
-                            color: Colors.white,
-                          ),
-                          style: IconButton.styleFrom(
-                            backgroundColor: Colors.white24,
-                            shape: const CircleBorder(),
-                          ),
-                        ),
-                        const SizedBox(width: 8),
-                        IconButton(
-                          onPressed: () async {
-                            await AuthService().signOut();
-                            if (context.mounted) {
-                              Navigator.pushAndRemoveUntil(
+                      ],
+                    ),
+                  ),
+
+                  // Body Content
+                  Padding(
+                    padding: const EdgeInsets.all(24.0),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        // Create New Request Button
+                        SizedBox(
+                          width: double.infinity,
+                          height: 56,
+                          child: ElevatedButton.icon(
+                            onPressed: () {
+                              Navigator.push(
                                 context,
                                 MaterialPageRoute(
-                                  builder: (_) => const RoleSelectionScreen(),
+                                  builder: (context) =>
+                                      const CreateRequestScreen(),
                                 ),
-                                (route) => false,
                               );
-                            }
-                          },
-                          icon: const Icon(
-                            Icons.logout_rounded,
-                            color: Colors.white,
-                          ),
-                          style: IconButton.styleFrom(
-                            backgroundColor: Colors.white24,
-                            shape: const CircleBorder(),
+                            },
+                            icon: const Icon(Icons.add),
+                            label: const Text(
+                              'Create New Request',
+                              style: TextStyle(
+                                fontSize: 16,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: const Color(
+                                0xFF059669,
+                              ), // Darker green
+                              foregroundColor: Colors.white,
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(12),
+                              ),
+                              elevation: 4,
+                              shadowColor: const Color(
+                                0xFF059669,
+                              ).withOpacity(0.4),
+                            ),
                           ),
                         ),
+                        const SizedBox(height: 32),
+
+                        // Active Requests Header
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            const Text(
+                              'Active Requests',
+                              style: TextStyle(
+                                fontSize: 18,
+                                fontWeight: FontWeight.bold,
+                                color: AppColors.textDark,
+                              ),
+                            ),
+                            Text(
+                              '${activeRequests.length} active',
+                              style: const TextStyle(
+                                color: AppColors.primaryGreen,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 16),
+
+                        // Active Request Cards
+                        if (activeRequests.isEmpty)
+                          const Center(
+                            child: Padding(
+                              padding: EdgeInsets.all(20.0),
+                              child: Text('No active requests'),
+                            ),
+                          )
+                        else
+                          ...activeRequests.map((doc) {
+                            final data = doc.data() as Map<String, dynamic>;
+                            return Padding(
+                              padding: const EdgeInsets.only(bottom: 16.0),
+                              child: _RequestCard(
+                                title: data['category'] ?? 'Request',
+                                status: data['status'] ?? 'Pending',
+                                statusColor: _getStatusColor(
+                                  data['status'] ?? 'Pending',
+                                ),
+                                statusTextColor: _getStatusTextColor(
+                                  data['status'] ?? 'Pending',
+                                ),
+                                priority:
+                                    '${data['urgency'] ?? 'Medium'} Priority',
+                                priorityColor: _getUrgencyColor(
+                                  data['urgency'] ?? 'Medium',
+                                ),
+                                description: data['description'] ?? '',
+                                location: data['address'] ?? 'Location',
+                                time: _getTimeAgo(
+                                  data['createdAt'] as Timestamp?,
+                                ),
+                                volunteerName: data['volunteerName'],
+                                icon: _getCategoryIcon(
+                                  data['category']?.toString().toLowerCase(),
+                                ),
+                                onTap: () {
+                                  Navigator.push(
+                                    context,
+                                    MaterialPageRoute(
+                                      builder: (context) => RequestDetailScreen(
+                                        requestData: data,
+                                        requestId: doc.id,
+                                      ),
+                                    ),
+                                  );
+                                },
+                              ),
+                            );
+                          }),
+
+                        const SizedBox(height: 32),
+
+                        // Past Requests Header
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            const Text(
+                              'Past Requests',
+                              style: TextStyle(
+                                fontSize: 18,
+                                fontWeight: FontWeight.bold,
+                                color: AppColors.textDark,
+                              ),
+                            ),
+                            TextButton(
+                              onPressed: () {},
+                              child: const Text('View All'),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 16),
+
+                        // Past Request Cards
+                        if (pastRequests.isEmpty)
+                          const Center(
+                            child: Padding(
+                              padding: EdgeInsets.all(20.0),
+                              child: Text('No past requests'),
+                            ),
+                          )
+                        else
+                          ...pastRequests.map((doc) {
+                            final data = doc.data() as Map<String, dynamic>;
+                            return Padding(
+                              padding: const EdgeInsets.only(bottom: 16.0),
+                              child: _RequestCard(
+                                title: data['category'] ?? 'Request',
+                                status: data['status'] ?? 'Completed',
+                                statusColor: _getStatusColor(
+                                  data['status'] ?? 'Completed',
+                                ),
+                                statusTextColor: _getStatusTextColor(
+                                  data['status'] ?? 'Completed',
+                                ),
+                                priority:
+                                    '${data['urgency'] ?? 'Medium'} Priority',
+                                priorityColor: _getUrgencyColor(
+                                  data['urgency'] ?? 'Medium',
+                                ),
+                                description: data['description'] ?? '',
+                                location: data['address'] ?? 'Location',
+                                time: _getTimeAgo(
+                                  data['createdAt'] as Timestamp?,
+                                ),
+                                icon: _getCategoryIcon(
+                                  data['category']?.toString().toLowerCase(),
+                                ),
+                                isCompleted: true,
+                                onTap: () {
+                                  Navigator.push(
+                                    context,
+                                    MaterialPageRoute(
+                                      builder: (context) => RequestDetailScreen(
+                                        requestData: data,
+                                        requestId: doc.id,
+                                      ),
+                                    ),
+                                  );
+                                },
+                              ),
+                            );
+                          }),
+                        const SizedBox(height: 80), // Bottom padding
                       ],
                     ),
-                  ],
-                ),
+                  ),
+                ],
               ),
-
-              // Body Content
-              Padding(
-                padding: const EdgeInsets.all(24.0),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    // Create New Request Button
-                    SizedBox(
-                      width: double.infinity,
-                      height: 56,
-                      child: ElevatedButton.icon(
-                        onPressed: () {
-                          Navigator.push(
-                            context,
-                            MaterialPageRoute(
-                              builder: (context) => const CreateRequestScreen(),
-                            ),
-                          );
-                        },
-                        icon: const Icon(Icons.add),
-                        label: const Text(
-                          'Create New Request',
-                          style: TextStyle(
-                            fontSize: 16,
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ),
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: const Color(
-                            0xFF059669,
-                          ), // Darker green
-                          foregroundColor: Colors.white,
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(12),
-                          ),
-                          elevation: 4,
-                          shadowColor: const Color(0xFF059669).withOpacity(0.4),
-                        ),
-                      ),
-                    ),
-                    const SizedBox(height: 32),
-
-                    // Active Requests Header
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        const Text(
-                          'Active Requests',
-                          style: TextStyle(
-                            fontSize: 18,
-                            fontWeight: FontWeight.bold,
-                            color: AppColors.textDark,
-                          ),
-                        ),
-                        Text(
-                          '${activeRequests.length} active',
-                          style: const TextStyle(
-                            color: AppColors.primaryGreen,
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 16),
-
-                    // Active Request Cards
-                    if (activeRequests.isEmpty)
-                      const Center(
-                        child: Padding(
-                          padding: EdgeInsets.all(20.0),
-                          child: Text('No active requests'),
-                        ),
-                      )
-                    else
-                      ...activeRequests.map((doc) {
-                        final data = doc.data() as Map<String, dynamic>;
-                        return Padding(
-                          padding: const EdgeInsets.only(bottom: 16.0),
-                          child: _RequestCard(
-                            title: data['category'] ?? 'Request',
-                            status: data['status'] ?? 'Pending',
-                            statusColor: _getStatusColor(
-                              data['status'] ?? 'Pending',
-                            ),
-                            statusTextColor: _getStatusTextColor(
-                              data['status'] ?? 'Pending',
-                            ),
-                            priority: '${data['urgency'] ?? 'Medium'} Priority',
-                            priorityColor: _getUrgencyColor(
-                              data['urgency'] ?? 'Medium',
-                            ),
-                            description: data['description'] ?? '',
-                            location: data['address'] ?? 'Location',
-                            time: _getTimeAgo(data['createdAt'] as Timestamp?),
-                            volunteerName: data['volunteerName'],
-                            icon: _getCategoryIcon(
-                              data['category']?.toString().toLowerCase(),
-                            ),
-                          ),
-                        );
-                      }),
-
-                    const SizedBox(height: 32),
-
-                    // Past Requests Header
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        const Text(
-                          'Past Requests',
-                          style: TextStyle(
-                            fontSize: 18,
-                            fontWeight: FontWeight.bold,
-                            color: AppColors.textDark,
-                          ),
-                        ),
-                        TextButton(
-                          onPressed: () {},
-                          child: const Text('View All'),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 16),
-
-                    // Past Request Cards
-                    if (pastRequests.isEmpty)
-                      const Center(
-                        child: Padding(
-                          padding: EdgeInsets.all(20.0),
-                          child: Text('No past requests'),
-                        ),
-                      )
-                    else
-                      ...pastRequests.map((doc) {
-                        final data = doc.data() as Map<String, dynamic>;
-                        return Padding(
-                          padding: const EdgeInsets.only(bottom: 16.0),
-                          child: _RequestCard(
-                            title: data['category'] ?? 'Request',
-                            status: data['status'] ?? 'Completed',
-                            statusColor: _getStatusColor(
-                              data['status'] ?? 'Completed',
-                            ),
-                            statusTextColor: _getStatusTextColor(
-                              data['status'] ?? 'Completed',
-                            ),
-                            priority: '${data['urgency'] ?? 'Medium'} Priority',
-                            priorityColor: _getUrgencyColor(
-                              data['urgency'] ?? 'Medium',
-                            ),
-                            description: data['description'] ?? '',
-                            location: data['address'] ?? 'Location',
-                            time: _getTimeAgo(data['createdAt'] as Timestamp?),
-                            icon: _getCategoryIcon(
-                              data['category']?.toString().toLowerCase(),
-                            ),
-                            isCompleted: true,
-                          ),
-                        );
-                      }),
-                    const SizedBox(height: 80), // Bottom padding
-                  ],
-                ),
-              ),
-            ],
-          ),
+            );
+          },
         );
       },
+    );
+  }
+}
+
+class _RequestsTab extends StatefulWidget {
+  const _RequestsTab();
+
+  @override
+  State<_RequestsTab> createState() => _RequestsTabState();
+}
+
+class _RequestsTabState extends State<_RequestsTab> {
+  String _filter = 'All'; // All, Active, Past
+
+  String _getTimeAgo(Timestamp? timestamp) {
+    if (timestamp == null) return '';
+    final now = DateTime.now();
+    final difference = now.difference(timestamp.toDate());
+
+    if (difference.inDays > 0) {
+      return '${difference.inDays} days ago';
+    } else if (difference.inHours > 0) {
+      return '${difference.inHours} hours ago';
+    } else if (difference.inMinutes > 0) {
+      return '${difference.inMinutes} mins ago';
+    } else {
+      return 'Just now';
+    }
+  }
+
+  Color _getStatusColor(String status) {
+    switch (status.toLowerCase()) {
+      case 'pending':
+        return const Color(0xFFFEF3C7);
+      case 'approved':
+      case 'assigned':
+      case 'arriving':
+        return const Color(0xFFDCFCE7);
+      case 'completed':
+        return const Color(0xFFF3F4F6);
+      case 'rejected':
+      case 'cancelled':
+        return const Color(0xFFFEE2E2);
+      default:
+        return Colors.grey.shade100;
+    }
+  }
+
+  Color _getStatusTextColor(String status) {
+    switch (status.toLowerCase()) {
+      case 'pending':
+        return const Color(0xFFD97706);
+      case 'approved':
+      case 'assigned':
+      case 'arriving':
+        return const Color(0xFF166534);
+      case 'completed':
+        return const Color(0xFF4B5563);
+      case 'rejected':
+      case 'cancelled':
+        return const Color(0xFFDC2626);
+      default:
+        return Colors.grey.shade700;
+    }
+  }
+
+  Color _getUrgencyColor(String urgency) {
+    switch (urgency.toLowerCase()) {
+      case 'critical':
+        return Colors.red;
+      case 'high':
+        return Colors.orange;
+      case 'medium':
+        return Colors.blue;
+      case 'low':
+        return Colors.green;
+      default:
+        return Colors.grey;
+    }
+  }
+
+  IconData _getCategoryIcon(String? category) {
+    switch (category?.toLowerCase()) {
+      case 'food package':
+      case 'food':
+        return Icons.inventory_2_outlined;
+      case 'medical supplies':
+      case 'medical':
+        return Icons.medical_services_outlined;
+      case 'clothing & essentials':
+      case 'clothing':
+        return Icons.checkroom_outlined;
+      case 'shelter materials':
+      case 'shelter':
+        return Icons.home_work_outlined;
+      case 'cash assistance':
+      case 'cash':
+        return Icons.payments_outlined;
+      default:
+        return Icons.help_outline_rounded;
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final user = FirebaseAuth.instance.currentUser;
+
+    return Scaffold(
+      backgroundColor: AppColors.background,
+      appBar: AppBar(
+        title: const Text(
+          'My Requests',
+          style: TextStyle(
+            color: AppColors.textDark,
+            fontWeight: FontWeight.bold,
+          ),
+        ),
+        backgroundColor: Colors.white,
+        elevation: 0,
+        automaticallyImplyLeading: false,
+        actions: [
+          PopupMenuButton<String>(
+            icon: const Icon(Icons.filter_list, color: AppColors.textDark),
+            onSelected: (value) {
+              setState(() {
+                _filter = value;
+              });
+            },
+            itemBuilder: (context) => [
+              const PopupMenuItem(value: 'All', child: Text('All Requests')),
+              const PopupMenuItem(value: 'Active', child: Text('Active Only')),
+              const PopupMenuItem(value: 'Past', child: Text('Past Only')),
+            ],
+          ),
+        ],
+      ),
+      body: StreamBuilder<QuerySnapshot>(
+        stream: FirebaseFirestore.instance
+            .collection('requests')
+            .where('userId', isEqualTo: user?.uid)
+            .orderBy('createdAt', descending: true)
+            .snapshots(),
+        builder: (context, snapshot) {
+          if (snapshot.hasError) {
+            return Center(child: Text('Error: ${snapshot.error}'));
+          }
+
+          if (snapshot.connectionState == ConnectionState.waiting) {
+            return const Center(child: CircularProgressIndicator());
+          }
+
+          final docs = snapshot.data?.docs ?? [];
+
+          final filteredDocs = docs.where((doc) {
+            final status = (doc['status'] as String).toLowerCase();
+            final isActive = [
+              'pending',
+              'approved',
+              'assigned',
+              'arriving',
+            ].contains(status);
+
+            if (_filter == 'Active') return isActive;
+            if (_filter == 'Past') return !isActive;
+            return true;
+          }).toList();
+
+          if (filteredDocs.isEmpty) {
+            return Center(
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  const Icon(
+                    Icons.inbox_outlined,
+                    size: 64,
+                    color: Colors.grey,
+                  ),
+                  const SizedBox(height: 16),
+                  const Text(
+                    'No requests found',
+                    style: TextStyle(color: Colors.grey),
+                  ),
+                  const SizedBox(height: 24),
+                  ElevatedButton.icon(
+                    onPressed: () {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (context) => const CreateRequestScreen(),
+                        ),
+                      );
+                    },
+                    icon: const Icon(Icons.add),
+                    label: const Text('Create Request'),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: AppColors.primaryGreen,
+                      foregroundColor: Colors.white,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            );
+          }
+
+          return ListView.builder(
+            padding: const EdgeInsets.all(16),
+            itemCount: filteredDocs.length,
+            itemBuilder: (context, index) {
+              final doc = filteredDocs[index];
+              final data = doc.data() as Map<String, dynamic>;
+              final status = data['status'] ?? 'Pending';
+              final isCompleted = [
+                'completed',
+                'rejected',
+                'cancelled',
+              ].contains(status.toLowerCase());
+
+              return Padding(
+                padding: const EdgeInsets.only(bottom: 16.0),
+                child: _RequestCard(
+                  title: data['category'] ?? 'Request',
+                  status: status,
+                  statusColor: _getStatusColor(status),
+                  statusTextColor: _getStatusTextColor(status),
+                  priority: '${data['urgency'] ?? 'Medium'} Priority',
+                  priorityColor: _getUrgencyColor(data['urgency'] ?? 'Medium'),
+                  description: data['description'] ?? '',
+                  location: data['address'] ?? 'Location',
+                  time: _getTimeAgo(data['createdAt'] as Timestamp?),
+                  volunteerName: data['volunteerName'],
+                  icon: _getCategoryIcon(
+                    data['category']?.toString().toLowerCase(),
+                  ),
+                  isCompleted: isCompleted,
+                  onTap: () {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (context) => RequestDetailScreen(
+                          requestData: data,
+                          requestId: doc.id,
+                        ),
+                      ),
+                    );
+                  },
+                ),
+              );
+            },
+          );
+        },
+      ),
     );
   }
 }
@@ -553,116 +937,148 @@ class _ProfileTab extends StatelessWidget {
   Widget build(BuildContext context) {
     final user = FirebaseAuth.instance.currentUser;
 
-    return SingleChildScrollView(
-      child: Column(
-        children: [
-          Container(
-            padding: const EdgeInsets.fromLTRB(24, 60, 24, 30),
-            decoration: const BoxDecoration(
-              color: AppColors.primaryGreen,
-              borderRadius: BorderRadius.only(
-                bottomLeft: Radius.circular(30),
-                bottomRight: Radius.circular(30),
-              ),
-            ),
-            child: Row(
-              children: [
-                CircleAvatar(
-                  radius: 40,
-                  backgroundColor: Colors.white,
-                  backgroundImage: user?.photoURL != null
-                      ? NetworkImage(user!.photoURL!)
-                      : null,
-                  child: user?.photoURL == null
-                      ? const Icon(
-                          Icons.person,
-                          size: 40,
-                          color: AppColors.primaryGreen,
-                        )
-                      : null,
-                ),
-                const SizedBox(width: 16),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        user?.displayName ?? 'Beneficiary',
-                        style: const TextStyle(
-                          color: Colors.white,
-                          fontSize: 24,
-                          fontWeight: FontWeight.bold,
-                        ),
-                      ),
-                      const SizedBox(height: 4),
-                      Text(
-                        user?.email ?? '',
-                        style: const TextStyle(
-                          color: Colors.white70,
-                          fontSize: 14,
-                        ),
-                      ),
-                    ],
+    if (user == null) return const Center(child: Text("Not logged in"));
+
+    return StreamBuilder<DocumentSnapshot>(
+      stream: FirebaseFirestore.instance
+          .collection('users')
+          .doc(user.uid)
+          .snapshots(),
+      builder: (context, snapshot) {
+        if (snapshot.hasError) {
+          return const Center(child: Text("Something went wrong"));
+        }
+
+        if (snapshot.connectionState == ConnectionState.waiting) {
+          return const Center(child: CircularProgressIndicator());
+        }
+
+        final userData = snapshot.data?.data() as Map<String, dynamic>?;
+        final displayName =
+            userData?['name'] ?? user.displayName ?? 'Beneficiary';
+        final email = user.email ?? '';
+        final photoURL = userData?['photoURL'] ?? user.photoURL;
+
+        return SingleChildScrollView(
+          child: Column(
+            children: [
+              Container(
+                padding: const EdgeInsets.fromLTRB(24, 60, 24, 30),
+                decoration: const BoxDecoration(
+                  color: AppColors.primaryGreen,
+                  borderRadius: BorderRadius.only(
+                    bottomLeft: Radius.circular(30),
+                    bottomRight: Radius.circular(30),
                   ),
                 ),
-              ],
-            ),
-          ),
-          Padding(
-            padding: const EdgeInsets.all(24.0),
-            child: Column(
-              children: [
-                _buildProfileItem(Icons.person_outline, 'Edit Profile', () {
-                  Navigator.push(
-                    context,
-                    MaterialPageRoute(
-                      builder: (context) => const EditProfileScreen(),
+                child: Row(
+                  children: [
+                    CircleAvatar(
+                      radius: 40,
+                      backgroundColor: Colors.white,
+                      backgroundImage: photoURL != null
+                          ? NetworkImage(photoURL)
+                          : null,
+                      child: photoURL == null
+                          ? const Icon(
+                              Icons.person,
+                              size: 40,
+                              color: AppColors.primaryGreen,
+                            )
+                          : null,
                     ),
-                  );
-                }),
-                _buildProfileItem(Icons.history, 'Request History', () {}),
-                _buildProfileItem(
-                  Icons.notifications_outlined,
-                  'Notifications',
-                  () {},
-                ),
-                _buildProfileItem(Icons.settings_outlined, 'Settings', () {}),
-                _buildProfileItem(Icons.help_outline, 'Help & Support', () {}),
-                const SizedBox(height: 24),
-                SizedBox(
-                  width: double.infinity,
-                  child: OutlinedButton.icon(
-                    onPressed: () async {
-                      await AuthService().signOut();
-                      if (context.mounted) {
-                        Navigator.pushAndRemoveUntil(
-                          context,
-                          MaterialPageRoute(
-                            builder: (_) => const RoleSelectionScreen(),
+                    const SizedBox(width: 16),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            displayName,
+                            style: const TextStyle(
+                              color: Colors.white,
+                              fontSize: 24,
+                              fontWeight: FontWeight.bold,
+                            ),
                           ),
-                          (route) => false,
-                        );
-                      }
-                    },
-                    icon: const Icon(Icons.logout, color: Colors.red),
-                    label: const Text(
-                      'Logout',
-                      style: TextStyle(color: Colors.red),
-                    ),
-                    style: OutlinedButton.styleFrom(
-                      side: const BorderSide(color: Colors.red),
-                      padding: const EdgeInsets.symmetric(vertical: 16),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(12),
+                          const SizedBox(height: 4),
+                          Text(
+                            email,
+                            style: const TextStyle(
+                              color: Colors.white70,
+                              fontSize: 14,
+                            ),
+                          ),
+                        ],
                       ),
                     ),
-                  ),
+                  ],
                 ),
-              ],
-            ),
+              ),
+              Padding(
+                padding: const EdgeInsets.all(24.0),
+                child: Column(
+                  children: [
+                    _buildProfileItem(Icons.person_outline, 'Edit Profile', () {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (context) => const EditProfileScreen(),
+                        ),
+                      );
+                    }),
+                    _buildProfileItem(Icons.history, 'Request History', () {}),
+                    _buildProfileItem(
+                      Icons.notifications_outlined,
+                      'Notifications',
+                      () {},
+                    ),
+                    _buildProfileItem(
+                      Icons.settings_outlined,
+                      'Settings',
+                      () {},
+                    ),
+                    _buildProfileItem(
+                      Icons.help_outline,
+                      'Help & Support',
+                      () {},
+                    ),
+                    const SizedBox(height: 24),
+                    SizedBox(
+                      width: double.infinity,
+                      child: OutlinedButton.icon(
+                        onPressed: () async {
+                          await AuthService().signOut();
+                          if (context.mounted) {
+                            Navigator.pushAndRemoveUntil(
+                              context,
+                              MaterialPageRoute(
+                                builder: (_) => const RoleSelectionScreen(),
+                              ),
+                              (route) => false,
+                            );
+                          }
+                        },
+                        icon: const Icon(Icons.logout, color: Colors.red),
+                        label: const Text(
+                          'Logout',
+                          style: TextStyle(color: Colors.red),
+                        ),
+                        style: OutlinedButton.styleFrom(
+                          side: const BorderSide(color: Colors.red),
+                          padding: const EdgeInsets.symmetric(vertical: 16),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
           ),
-        ],
-      ),
+        );
+      },
     );
   }
 
@@ -719,6 +1135,8 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
   final _nameController = TextEditingController();
   final _phoneController = TextEditingController();
   bool _isLoading = false;
+  File? _imageFile;
+  String? _currentPhotoURL;
 
   @override
   void initState() {
@@ -729,15 +1147,34 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
   Future<void> _loadUserData() async {
     final user = FirebaseAuth.instance.currentUser;
     if (user != null) {
-      _nameController.text = user.displayName ?? '';
       // Fetch phone from Firestore if stored there, or user.phoneNumber
       final doc = await FirebaseFirestore.instance
           .collection('users')
           .doc(user.uid)
           .get();
       if (doc.exists) {
-        _phoneController.text = doc.data()?['phone'] ?? '';
+        final data = doc.data();
+        _nameController.text = data?['name'] ?? user.displayName ?? '';
+        _phoneController.text = data?['phone'] ?? '';
+        if (mounted) {
+          setState(() {
+            _currentPhotoURL = data?['photoURL'] ?? user.photoURL;
+          });
+        }
+      } else {
+        _nameController.text = user.displayName ?? '';
       }
+    }
+  }
+
+  Future<void> _pickImage() async {
+    final picker = ImagePicker();
+    final pickedFile = await picker.pickImage(source: ImageSource.gallery);
+
+    if (pickedFile != null) {
+      setState(() {
+        _imageFile = File(pickedFile.path);
+      });
     }
   }
 
@@ -758,17 +1195,37 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
     try {
       final user = FirebaseAuth.instance.currentUser;
       if (user != null) {
+        String? photoURL = _currentPhotoURL;
+
+        // Upload image if selected
+        if (_imageFile != null) {
+          final storageRef = FirebaseStorage.instance
+              .ref()
+              .child('user_profiles')
+              .child('${user.uid}.jpg');
+
+          await storageRef.putFile(_imageFile!);
+          photoURL = await storageRef.getDownloadURL();
+
+          // Update Auth photoURL
+          await user.updatePhotoURL(photoURL);
+        }
+
         // Update display name in Auth
-        await user.updateDisplayName(_nameController.text);
+        if (_nameController.text != user.displayName) {
+          await user.updateDisplayName(_nameController.text);
+        }
 
         // Update Firestore
-        await FirebaseFirestore.instance
-            .collection('users')
-            .doc(user.uid)
-            .update({
-              'name': _nameController.text,
-              'phone': _phoneController.text,
-            });
+        await FirebaseFirestore.instance.collection('users').doc(user.uid).set({
+          'name': _nameController.text,
+          'phone': _phoneController.text,
+          'photoURL': photoURL,
+          'updatedAt': FieldValue.serverTimestamp(),
+        }, SetOptions(merge: true));
+
+        // Reload user to ensure local auth state is fresh
+        await user.reload();
 
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
@@ -813,25 +1270,32 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                   CircleAvatar(
                     radius: 50,
                     backgroundColor: Colors.grey.shade200,
-                    child: const Icon(
-                      Icons.person,
-                      size: 50,
-                      color: Colors.grey,
-                    ),
+                    backgroundImage: _imageFile != null
+                        ? FileImage(_imageFile!)
+                        : (_currentPhotoURL != null
+                                  ? NetworkImage(_currentPhotoURL!)
+                                  : null)
+                              as ImageProvider?,
+                    child: (_imageFile == null && _currentPhotoURL == null)
+                        ? const Icon(Icons.person, size: 50, color: Colors.grey)
+                        : null,
                   ),
                   Positioned(
                     bottom: 0,
                     right: 0,
-                    child: Container(
-                      padding: const EdgeInsets.all(4),
-                      decoration: const BoxDecoration(
-                        color: AppColors.primaryGreen,
-                        shape: BoxShape.circle,
-                      ),
-                      child: const Icon(
-                        Icons.camera_alt,
-                        color: Colors.white,
-                        size: 20,
+                    child: InkWell(
+                      onTap: _pickImage,
+                      child: Container(
+                        padding: const EdgeInsets.all(8),
+                        decoration: const BoxDecoration(
+                          color: AppColors.primaryGreen,
+                          shape: BoxShape.circle,
+                        ),
+                        child: const Icon(
+                          Icons.camera_alt,
+                          color: Colors.white,
+                          size: 20,
+                        ),
                       ),
                     ),
                   ),
@@ -911,6 +1375,7 @@ class _RequestCard extends StatelessWidget {
   final String? volunteerName;
   final IconData icon;
   final bool isCompleted;
+  final VoidCallback? onTap;
 
   const _RequestCard({
     required this.title,
@@ -925,179 +1390,187 @@ class _RequestCard extends StatelessWidget {
     this.volunteerName,
     required this.icon,
     this.isCompleted = false,
+    this.onTap,
   });
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(16),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.05),
-            blurRadius: 10,
-            offset: const Offset(0, 4),
-          ),
-        ],
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          // Header Row
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Expanded(
-                child: Row(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Container(
-                      padding: const EdgeInsets.all(8),
-                      decoration: BoxDecoration(
-                        color: AppColors.background,
-                        borderRadius: BorderRadius.circular(8),
-                      ),
-                      child: Icon(icon, color: AppColors.primaryGreen),
-                    ),
-                    const SizedBox(width: 12),
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            title,
-                            style: const TextStyle(
-                              fontWeight: FontWeight.bold,
-                              fontSize: 16,
-                              color: AppColors.textDark,
-                            ),
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                          ),
-                          const SizedBox(height: 2),
-                          Text(
-                            priority,
-                            style: TextStyle(
-                              color: priorityColor,
-                              fontSize: 12,
-                              fontWeight: FontWeight.w500,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              const SizedBox(width: 8),
-              Container(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 10,
-                  vertical: 4,
-                ),
-                decoration: BoxDecoration(
-                  color: statusColor,
-                  borderRadius: BorderRadius.circular(20),
-                ),
-                child: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    if (!isCompleted) ...[
-                      Container(
-                        width: 6,
-                        height: 6,
-                        decoration: BoxDecoration(
-                          color: statusTextColor,
-                          shape: BoxShape.circle,
-                        ),
-                      ),
-                      const SizedBox(width: 6),
-                    ],
-                    Flexible(
-                      child: Text(
-                        status,
-                        style: TextStyle(
-                          color: statusTextColor,
-                          fontSize: 12,
-                          fontWeight: FontWeight.bold,
-                        ),
-                        overflow: TextOverflow.ellipsis,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 12),
-
-          // Description
-          Text(
-            description,
-            style: const TextStyle(color: AppColors.textLight, height: 1.4),
-            maxLines: 2,
-            overflow: TextOverflow.ellipsis,
-          ),
-          const SizedBox(height: 12),
-          const Divider(height: 1),
-          const SizedBox(height: 12),
-
-          // Footer Info
-          Row(
-            children: [
-              const Icon(
-                Icons.location_on_outlined,
-                size: 16,
-                color: Colors.grey,
-              ),
-              const SizedBox(width: 4),
-              Expanded(
-                child: Text(
-                  location,
-                  style: const TextStyle(color: Colors.grey, fontSize: 12),
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                ),
-              ),
-              const SizedBox(width: 16),
-              const Icon(Icons.access_time, size: 16, color: Colors.grey),
-              const SizedBox(width: 4),
-              Text(
-                time,
-                style: const TextStyle(color: Colors.grey, fontSize: 12),
-              ),
-            ],
-          ),
-
-          if (volunteerName != null) ...[
-            const SizedBox(height: 12),
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(16),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withOpacity(0.05),
+              blurRadius: 10,
+              offset: const Offset(0, 4),
+            ),
+          ],
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            // Header Row
             Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                const Icon(Icons.person_outline, size: 16, color: Colors.grey),
-                const SizedBox(width: 4),
-                const Text(
-                  'Volunteer: ',
-                  style: TextStyle(color: Colors.grey, fontSize: 12),
-                ),
                 Expanded(
-                  child: Text(
-                    volunteerName!,
-                    style: const TextStyle(
-                      color: AppColors.textDark,
-                      fontWeight: FontWeight.w600,
-                      fontSize: 12,
-                    ),
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
+                  child: Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Container(
+                        padding: const EdgeInsets.all(8),
+                        decoration: BoxDecoration(
+                          color: AppColors.background,
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        child: Icon(icon, color: AppColors.primaryGreen),
+                      ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              title,
+                              style: const TextStyle(
+                                fontWeight: FontWeight.bold,
+                                fontSize: 16,
+                                color: AppColors.textDark,
+                              ),
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                            const SizedBox(height: 2),
+                            Text(
+                              priority,
+                              style: TextStyle(
+                                color: priorityColor,
+                                fontSize: 12,
+                                fontWeight: FontWeight.w500,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(width: 8),
+                Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 10,
+                    vertical: 4,
+                  ),
+                  decoration: BoxDecoration(
+                    color: statusColor,
+                    borderRadius: BorderRadius.circular(20),
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      if (!isCompleted) ...[
+                        Container(
+                          width: 6,
+                          height: 6,
+                          decoration: BoxDecoration(
+                            color: statusTextColor,
+                            shape: BoxShape.circle,
+                          ),
+                        ),
+                        const SizedBox(width: 6),
+                      ],
+                      Flexible(
+                        child: Text(
+                          status,
+                          style: TextStyle(
+                            color: statusTextColor,
+                            fontSize: 12,
+                            fontWeight: FontWeight.bold,
+                          ),
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ),
+                    ],
                   ),
                 ),
               ],
             ),
+            const SizedBox(height: 12),
+
+            // Description
+            Text(
+              description,
+              style: const TextStyle(color: AppColors.textLight, height: 1.4),
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
+            ),
+            const SizedBox(height: 12),
+            const Divider(height: 1),
+            const SizedBox(height: 12),
+
+            // Footer Info
+            Row(
+              children: [
+                const Icon(
+                  Icons.location_on_outlined,
+                  size: 16,
+                  color: Colors.grey,
+                ),
+                const SizedBox(width: 4),
+                Expanded(
+                  child: Text(
+                    location,
+                    style: const TextStyle(color: Colors.grey, fontSize: 12),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ),
+                const SizedBox(width: 16),
+                const Icon(Icons.access_time, size: 16, color: Colors.grey),
+                const SizedBox(width: 4),
+                Text(
+                  time,
+                  style: const TextStyle(color: Colors.grey, fontSize: 12),
+                ),
+              ],
+            ),
+
+            if (volunteerName != null) ...[
+              const SizedBox(height: 12),
+              Row(
+                children: [
+                  const Icon(
+                    Icons.person_outline,
+                    size: 16,
+                    color: Colors.grey,
+                  ),
+                  const SizedBox(width: 4),
+                  const Text(
+                    'Volunteer: ',
+                    style: TextStyle(color: Colors.grey, fontSize: 12),
+                  ),
+                  Expanded(
+                    child: Text(
+                      volunteerName!,
+                      style: const TextStyle(
+                        color: AppColors.textDark,
+                        fontWeight: FontWeight.w600,
+                        fontSize: 12,
+                      ),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ),
+                ],
+              ),
+            ],
           ],
-        ],
+        ),
       ),
     );
   }

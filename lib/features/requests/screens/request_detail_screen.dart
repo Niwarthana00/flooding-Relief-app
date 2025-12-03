@@ -1,0 +1,460 @@
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:flutter/material.dart';
+import 'package:sahana/core/theme/app_colors.dart';
+
+class RequestDetailScreen extends StatelessWidget {
+  final Map<String, dynamic> requestData;
+  final String requestId;
+
+  const RequestDetailScreen({
+    super.key,
+    required this.requestData,
+    required this.requestId,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final category = requestData['category'] ?? 'Request';
+    final status = requestData['status'] ?? 'Pending';
+    final description = requestData['description'] ?? '';
+    final urgency = requestData['urgency'] ?? 'Medium';
+    final familySize = requestData['familySize'] ?? '1';
+    final address = requestData['address'] ?? 'Location not set';
+    final volunteerName = requestData['volunteerName'];
+    final volunteerPhone =
+        requestData['volunteerPhone'] ?? '+94 77 123 4567'; // Mock if missing
+    final createdAt = requestData['createdAt'] as Timestamp?;
+
+    return Scaffold(
+      backgroundColor: AppColors.background,
+      appBar: AppBar(
+        backgroundColor: AppColors.primaryGreen,
+        elevation: 0,
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back_ios, color: Colors.white),
+          onPressed: () => Navigator.pop(context),
+        ),
+        title: Text(
+          category,
+          style: const TextStyle(
+            color: Colors.white,
+            fontWeight: FontWeight.bold,
+          ),
+        ),
+        centerTitle: true,
+      ),
+      body: SingleChildScrollView(
+        padding: const EdgeInsets.all(16.0),
+        child: Column(
+          children: [
+            // Status Card
+            _buildStatusCard(status, createdAt),
+            const SizedBox(height: 16),
+
+            // Volunteer Card (Only if assigned)
+            if (volunteerName != null ||
+                [
+                  'assigned',
+                  'arriving',
+                  'completed',
+                ].contains(status.toLowerCase()))
+              _buildVolunteerCard(volunteerName ?? 'Volunteer', volunteerPhone),
+
+            if (volunteerName != null) const SizedBox(height: 16),
+
+            // Track Location Button (Only if active)
+            if (['assigned', 'arriving'].contains(status.toLowerCase()))
+              _buildTrackLocationButton(),
+
+            if (['assigned', 'arriving'].contains(status.toLowerCase()))
+              const SizedBox(height: 16),
+
+            // Request Details Card
+            _buildDetailsCard(description, familySize, urgency, address),
+            const SizedBox(height: 30),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildStatusCard(String status, Timestamp? createdAt) {
+    final steps = [
+      {'title': 'Request Submitted', 'time': _formatTime(createdAt)},
+      {'title': 'Volunteer Assigned', 'time': 'Waiting...'},
+      {'title': 'On The Way', 'time': 'ETA: --'},
+      {'title': 'Delivered', 'time': ''},
+    ];
+
+    int currentStep = 0;
+    final s = status.toLowerCase();
+    if (s == 'pending')
+      currentStep = 1;
+    else if (s == 'assigned')
+      currentStep = 2;
+    else if (s == 'arriving')
+      currentStep = 3;
+    else if (s == 'completed')
+      currentStep = 4;
+
+    return Container(
+      padding: const EdgeInsets.all(20),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.05),
+            blurRadius: 10,
+            offset: const Offset(0, 4),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Text(
+            'Request Status',
+            style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+          ),
+          const SizedBox(height: 20),
+          ListView.builder(
+            shrinkWrap: true,
+            physics: const NeverScrollableScrollPhysics(),
+            itemCount: steps.length,
+            itemBuilder: (context, index) {
+              final isCompleted = index < currentStep;
+              final isLast = index == steps.length - 1;
+
+              return Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Column(
+                    children: [
+                      Container(
+                        width: 24,
+                        height: 24,
+                        decoration: BoxDecoration(
+                          color: isCompleted
+                              ? const Color(0xFF10B981)
+                              : Colors.grey.shade200,
+                          shape: BoxShape.circle,
+                        ),
+                        child: isCompleted
+                            ? const Icon(
+                                Icons.check,
+                                size: 16,
+                                color: Colors.white,
+                              )
+                            : Center(
+                                child: Text(
+                                  '${index + 1}',
+                                  style: TextStyle(
+                                    fontSize: 12,
+                                    color: Colors.grey.shade600,
+                                    fontWeight: FontWeight.bold,
+                                  ),
+                                ),
+                              ),
+                      ),
+                      if (!isLast)
+                        Container(
+                          width: 2,
+                          height: 40,
+                          color: isCompleted
+                              ? const Color(0xFF10B981)
+                              : Colors.grey.shade200,
+                        ),
+                    ],
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          steps[index]['title']!,
+                          style: TextStyle(
+                            fontWeight: FontWeight.w600,
+                            color: isCompleted
+                                ? AppColors.textDark
+                                : Colors.grey,
+                          ),
+                        ),
+                        if (steps[index]['time']!.isNotEmpty && isCompleted)
+                          Text(
+                            steps[index]['time']!,
+                            style: TextStyle(
+                              fontSize: 12,
+                              color: isCompleted
+                                  ? const Color(0xFF10B981)
+                                  : Colors.grey,
+                            ),
+                          ),
+                        const SizedBox(height: 30), // Spacing for timeline line
+                      ],
+                    ),
+                  ),
+                ],
+              );
+            },
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildVolunteerCard(String name, String phone) {
+    return Container(
+      padding: const EdgeInsets.all(20),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.05),
+            blurRadius: 10,
+            offset: const Offset(0, 4),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Text(
+            'Volunteer Information',
+            style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+          ),
+          const SizedBox(height: 16),
+          Row(
+            children: [
+              CircleAvatar(
+                radius: 24,
+                backgroundColor: Colors.blue,
+                child: Text(
+                  name.isNotEmpty ? name[0].toUpperCase() : 'V',
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+              ),
+              const SizedBox(width: 16),
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    name,
+                    style: const TextStyle(
+                      fontWeight: FontWeight.bold,
+                      fontSize: 16,
+                      color: AppColors.textDark,
+                    ),
+                  ),
+                  Text(
+                    phone,
+                    style: const TextStyle(color: Colors.grey, fontSize: 14),
+                  ),
+                ],
+              ),
+            ],
+          ),
+          const SizedBox(height: 20),
+          Row(
+            children: [
+              Expanded(
+                child: ElevatedButton.icon(
+                  onPressed: () {}, // TODO: Implement call
+                  icon: const Icon(Icons.call, size: 18),
+                  label: const Text('Call'),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: const Color(0xFF10B981),
+                    foregroundColor: Colors.white,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    padding: const EdgeInsets.symmetric(vertical: 12),
+                  ),
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: ElevatedButton.icon(
+                  onPressed: () {}, // TODO: Implement chat
+                  icon: const Icon(Icons.chat_bubble_outline, size: 18),
+                  label: const Text('Chat'),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: const Color(0xFF2563EB),
+                    foregroundColor: Colors.white,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    padding: const EdgeInsets.symmetric(vertical: 12),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildTrackLocationButton() {
+    return SizedBox(
+      width: double.infinity,
+      child: ElevatedButton.icon(
+        onPressed: () {},
+        icon: const Icon(Icons.near_me),
+        label: const Text('Track Live Location'),
+        style: ElevatedButton.styleFrom(
+          backgroundColor: const Color(0xFF10B981),
+          foregroundColor: Colors.white,
+          padding: const EdgeInsets.symmetric(vertical: 16),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(12),
+          ),
+          elevation: 2,
+        ),
+      ),
+    );
+  }
+
+  Widget _buildDetailsCard(
+    String description,
+    dynamic familySize,
+    String urgency,
+    String address,
+  ) {
+    return Container(
+      padding: const EdgeInsets.all(20),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.05),
+            blurRadius: 10,
+            offset: const Offset(0, 4),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Text(
+            'Request Details',
+            style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+          ),
+          const SizedBox(height: 16),
+
+          _buildDetailLabel('Description'),
+          Text(
+            description,
+            style: const TextStyle(color: AppColors.textDark, height: 1.5),
+          ),
+          const SizedBox(height: 20),
+
+          // Items Requested (Mocked/Static for now as per image style, or parsed if we had data)
+          // Since we don't have itemized data, we'll skip the chips or show a placeholder if description is short.
+          // For now, let's stick to the fields we have.
+          Row(
+            children: [
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    _buildDetailLabel('Family Size'),
+                    Text(
+                      '$familySize members',
+                      style: const TextStyle(
+                        fontWeight: FontWeight.bold,
+                        fontSize: 16,
+                        color: AppColors.textDark,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    _buildDetailLabel('Urgency'),
+                    Text(
+                      urgency,
+                      style: TextStyle(
+                        fontWeight: FontWeight.bold,
+                        fontSize: 16,
+                        color: _getUrgencyColor(urgency),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 20),
+
+          _buildDetailLabel('Delivery Location'),
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Icon(
+                Icons.location_on_outlined,
+                color: Colors.grey,
+                size: 20,
+              ),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Text(
+                  address,
+                  style: const TextStyle(
+                    color: AppColors.textDark,
+                    fontWeight: FontWeight.w500,
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildDetailLabel(String label) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 8.0),
+      child: Text(
+        label,
+        style: const TextStyle(color: Colors.grey, fontSize: 12),
+      ),
+    );
+  }
+
+  Color _getUrgencyColor(String urgency) {
+    switch (urgency.toLowerCase()) {
+      case 'critical':
+        return Colors.red;
+      case 'high':
+        return Colors.orange;
+      case 'medium':
+        return Colors.blue;
+      case 'low':
+        return Colors.green;
+      default:
+        return Colors.black;
+    }
+  }
+
+  String _formatTime(Timestamp? timestamp) {
+    if (timestamp == null) return '';
+    final dt = timestamp.toDate();
+    final now = DateTime.now();
+    final diff = now.difference(dt);
+
+    if (diff.inMinutes < 60) return '${diff.inMinutes} mins ago';
+    if (diff.inHours < 24) return '${diff.inHours} hours ago';
+    return '${diff.inDays} days ago';
+  }
+}
