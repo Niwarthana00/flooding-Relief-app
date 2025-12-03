@@ -1,6 +1,8 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:sahana/core/theme/app_colors.dart';
+import 'package:sahana/features/requests/screens/tracking_screen.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 class RequestDetailScreen extends StatelessWidget {
   final Map<String, dynamic> requestData;
@@ -11,6 +13,13 @@ class RequestDetailScreen extends StatelessWidget {
     required this.requestData,
     required this.requestId,
   });
+
+  Future<void> _launchCaller(String phoneNumber) async {
+    final Uri launchUri = Uri(scheme: 'tel', path: phoneNumber);
+    if (await canLaunchUrl(launchUri)) {
+      await launchUrl(launchUri);
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -24,6 +33,7 @@ class RequestDetailScreen extends StatelessWidget {
     final volunteerPhone =
         requestData['volunteerPhone'] ?? '+94 77 123 4567'; // Mock if missing
     final createdAt = requestData['createdAt'] as Timestamp?;
+    final location = requestData['location'] as GeoPoint?;
 
     return Scaffold(
       backgroundColor: AppColors.background,
@@ -64,7 +74,7 @@ class RequestDetailScreen extends StatelessWidget {
 
             // Track Location Button (Only if active)
             if (['assigned', 'arriving'].contains(status.toLowerCase()))
-              _buildTrackLocationButton(),
+              _buildTrackLocationButton(context, location),
 
             if (['assigned', 'arriving'].contains(status.toLowerCase()))
               const SizedBox(height: 16),
@@ -264,7 +274,7 @@ class RequestDetailScreen extends StatelessWidget {
             children: [
               Expanded(
                 child: ElevatedButton.icon(
-                  onPressed: () {}, // TODO: Implement call
+                  onPressed: () => _launchCaller(phone),
                   icon: const Icon(Icons.call, size: 18),
                   label: const Text('Call'),
                   style: ElevatedButton.styleFrom(
@@ -300,11 +310,23 @@ class RequestDetailScreen extends StatelessWidget {
     );
   }
 
-  Widget _buildTrackLocationButton() {
+  Widget _buildTrackLocationButton(BuildContext context, GeoPoint? location) {
     return SizedBox(
       width: double.infinity,
       child: ElevatedButton.icon(
-        onPressed: () {},
+        onPressed: location == null
+            ? null
+            : () {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (context) => TrackingScreen(
+                      requestId: requestId,
+                      deliveryLocation: location,
+                    ),
+                  ),
+                );
+              },
         icon: const Icon(Icons.near_me),
         label: const Text('Track Live Location'),
         style: ElevatedButton.styleFrom(
