@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:sahana/core/theme/app_colors.dart';
 import 'package:sahana/features/auth/screens/beneficiary_login_screen.dart';
+import 'package:sahana/features/auth/screens/volunteer_login_screen.dart';
 
 class RoleSelectionScreen extends StatelessWidget {
   const RoleSelectionScreen({super.key});
@@ -80,7 +81,12 @@ class RoleSelectionScreen extends StatelessWidget {
                   icon: Icons.local_shipping_rounded,
                   color: AppColors.primaryBlue,
                   onTap: () {
-                    // TODO: Navigate to Volunteer Login/Register
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (context) => const VolunteerLoginScreen(),
+                      ),
+                    );
                   },
                 ),
 
