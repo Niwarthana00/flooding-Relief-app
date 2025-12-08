@@ -11,6 +11,9 @@ import 'package:sahana/core/services/auth_service.dart';
 import 'package:sahana/features/auth/screens/role_selection_screen.dart';
 import 'package:sahana/features/requests/screens/create_request_screen.dart';
 import 'package:sahana/features/requests/screens/request_detail_screen.dart';
+import 'package:provider/provider.dart';
+import 'package:sahana/core/providers/locale_provider.dart';
+import 'package:sahana/l10n/app_localizations.dart';
 
 class BeneficiaryDashboard extends StatefulWidget {
   const BeneficiaryDashboard({super.key});
@@ -44,18 +47,18 @@ class _BeneficiaryDashboardState extends State<BeneficiaryDashboard> {
         unselectedItemColor: Colors.grey,
         showUnselectedLabels: true,
         type: BottomNavigationBarType.fixed,
-        items: const [
+        items: [
           BottomNavigationBarItem(
-            icon: Icon(Icons.home_rounded),
-            label: 'Home',
+            icon: const Icon(Icons.home_rounded),
+            label: AppLocalizations.of(context)!.home,
           ),
           BottomNavigationBarItem(
-            icon: Icon(Icons.add_circle_outline_rounded),
-            label: 'Requests',
+            icon: const Icon(Icons.add_circle_outline_rounded),
+            label: AppLocalizations.of(context)!.requests,
           ),
           BottomNavigationBarItem(
-            icon: Icon(Icons.person_outline_rounded),
-            label: 'Profile',
+            icon: const Icon(Icons.person_outline_rounded),
+            label: AppLocalizations.of(context)!.profile,
           ),
         ],
       ),
@@ -782,9 +785,9 @@ class _RequestsTabState extends State<_RequestsTab> {
     return Scaffold(
       backgroundColor: AppColors.background,
       appBar: AppBar(
-        title: const Text(
-          'My Requests',
-          style: TextStyle(
+        title: Text(
+          AppLocalizations.of(context)!.requests,
+          style: const TextStyle(
             color: AppColors.textDark,
             fontWeight: FontWeight.bold,
           ),
@@ -1018,15 +1021,30 @@ class _ProfileTab extends StatelessWidget {
                 padding: const EdgeInsets.all(24.0),
                 child: Column(
                   children: [
-                    _buildProfileItem(Icons.person_outline, 'Edit Profile', () {
-                      Navigator.push(
-                        context,
-                        MaterialPageRoute(
-                          builder: (context) => const EditProfileScreen(),
-                        ),
-                      );
-                    }),
-                    _buildProfileItem(Icons.history, 'Request History', () {}),
+                    _buildProfileItem(
+                      Icons.person_outline,
+                      AppLocalizations.of(context)!.editProfile,
+                      () {
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (context) => const EditProfileScreen(),
+                          ),
+                        );
+                      },
+                    ),
+                    _buildProfileItem(
+                      Icons.language,
+                      AppLocalizations.of(context)!.changeLanguage,
+                      () {
+                        _showLanguageBottomSheet(context);
+                      },
+                    ),
+                    _buildProfileItem(
+                      Icons.history,
+                      AppLocalizations.of(context)!.history,
+                      () {},
+                    ),
                     _buildProfileItem(
                       Icons.notifications_outlined,
                       'Notifications',
@@ -1059,9 +1077,9 @@ class _ProfileTab extends StatelessWidget {
                           }
                         },
                         icon: const Icon(Icons.logout, color: Colors.red),
-                        label: const Text(
-                          'Logout',
-                          style: TextStyle(color: Colors.red),
+                        label: Text(
+                          AppLocalizations.of(context)!.logout,
+                          style: const TextStyle(color: Colors.red),
                         ),
                         style: OutlinedButton.styleFrom(
                           side: const BorderSide(color: Colors.red),
@@ -1119,6 +1137,61 @@ class _ProfileTab extends StatelessWidget {
         ),
         onTap: onTap,
       ),
+    );
+  }
+
+  void _showLanguageBottomSheet(BuildContext context) {
+    showModalBottomSheet(
+      context: context,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (context) {
+        return Consumer<LocaleProvider>(
+          builder: (context, provider, child) {
+            return Container(
+              padding: const EdgeInsets.all(24),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Text(
+                    'Select Language',
+                    style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
+                  ),
+                  const SizedBox(height: 16),
+                  _buildLanguageItem(context, provider, 'English', 'en'),
+                  _buildLanguageItem(context, provider, 'සිංහල', 'si'),
+                  _buildLanguageItem(context, provider, 'தமிழ்', 'ta'),
+                ],
+              ),
+            );
+          },
+        );
+      },
+    );
+  }
+
+  Widget _buildLanguageItem(
+    BuildContext context,
+    LocaleProvider provider,
+    String name,
+    String code,
+  ) {
+    final isSelected = provider.locale.languageCode == code;
+    return ListTile(
+      leading: Text(
+        code.toUpperCase(),
+        style: const TextStyle(fontWeight: FontWeight.bold, color: Colors.grey),
+      ),
+      title: Text(name),
+      trailing: isSelected
+          ? const Icon(Icons.check_circle, color: AppColors.primaryGreen)
+          : null,
+      onTap: () {
+        provider.setLocale(Locale(code));
+        Navigator.pop(context);
+      },
     );
   }
 }

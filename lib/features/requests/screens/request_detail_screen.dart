@@ -90,6 +90,12 @@ class RequestDetailScreen extends StatelessWidget {
             ].contains(status.toLowerCase()))
               const SizedBox(height: 16),
 
+            // Status Update Button (Only for assigned volunteer)
+            if (FirebaseAuth.instance.currentUser?.uid ==
+                    requestData['volunteerId'] &&
+                ['assigned', 'arriving'].contains(status.toLowerCase()))
+              _buildStatusUpdateButton(context, status),
+
             // Request Details Card
             _buildDetailsCard(description, familySize, urgency, address),
             const SizedBox(height: 30),
@@ -358,7 +364,6 @@ class RequestDetailScreen extends StatelessWidget {
       width: double.infinity,
       child: ElevatedButton.icon(
         onPressed: () async {
-          // TODO: Ideally move this to a service or provider
           try {
             final user = FirebaseAuth.instance.currentUser;
             if (user != null) {
@@ -391,6 +396,61 @@ class RequestDetailScreen extends StatelessWidget {
         label: const Text('Accept Request'),
         style: ElevatedButton.styleFrom(
           backgroundColor: AppColors.primaryBlue,
+          foregroundColor: Colors.white,
+          padding: const EdgeInsets.symmetric(vertical: 16),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(12),
+          ),
+          elevation: 2,
+        ),
+      ),
+    );
+  }
+
+  Widget _buildStatusUpdateButton(BuildContext context, String currentStatus) {
+    String nextStatus = '';
+    String buttonText = '';
+    Color buttonColor = AppColors.primaryBlue;
+
+    if (currentStatus.toLowerCase() == 'assigned') {
+      nextStatus = 'arriving';
+      buttonText = 'Mark as Arriving';
+      buttonColor = Colors.orange;
+    } else if (currentStatus.toLowerCase() == 'arriving') {
+      nextStatus = 'completed';
+      buttonText = 'Mark as Completed';
+      buttonColor = Colors.green;
+    } else {
+      return const SizedBox.shrink();
+    }
+
+    return SizedBox(
+      width: double.infinity,
+      child: ElevatedButton.icon(
+        onPressed: () async {
+          try {
+            await FirebaseFirestore.instance
+                .collection('requests')
+                .doc(requestId)
+                .update({'status': nextStatus});
+            if (context.mounted) {
+              ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(content: Text('Status updated to $nextStatus!')),
+              );
+              Navigator.pop(context);
+            }
+          } catch (e) {
+            if (context.mounted) {
+              ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(content: Text('Error updating status: $e')),
+              );
+            }
+          }
+        },
+        icon: const Icon(Icons.update),
+        label: Text(buttonText),
+        style: ElevatedButton.styleFrom(
+          backgroundColor: buttonColor,
           foregroundColor: Colors.white,
           padding: const EdgeInsets.symmetric(vertical: 16),
           shape: RoundedRectangleBorder(
