@@ -77,8 +77,10 @@ class RequestDetailScreen extends StatelessWidget {
             if (['assigned', 'arriving'].contains(status.toLowerCase()))
               _buildTrackLocationButton(context, location),
 
-            // Accept Button (Only if pending)
-            if (status.toLowerCase() == 'pending') _buildAcceptButton(context),
+            // Accept Button (Only if pending and NOT the owner)
+            if (status.toLowerCase() == 'pending' &&
+                FirebaseAuth.instance.currentUser?.uid != requestData['userId'])
+              _buildAcceptButton(context),
 
             if ([
               'assigned',

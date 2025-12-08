@@ -484,11 +484,14 @@ class _VolunteerDashboardState extends State<VolunteerDashboard> {
 
   Widget _buildAvailableRequestsList() {
     return StreamBuilder<QuerySnapshot>(
-      stream: FirebaseFirestore.instance
-          .collection('requests')
-          .where('status', whereIn: ['pending', 'Pending'])
-          .snapshots(),
+      stream: FirebaseFirestore.instance.collection('requests').snapshots(),
       builder: (context, snapshot) {
+        if (snapshot.hasError) {
+          return SliverToBoxAdapter(
+            child: Center(child: Text("Error: ${snapshot.error}")),
+          );
+        }
+
         if (snapshot.connectionState == ConnectionState.waiting) {
           return const SliverToBoxAdapter(
             child: Center(child: CircularProgressIndicator()),
@@ -504,11 +507,14 @@ class _VolunteerDashboardState extends State<VolunteerDashboard> {
         final docs = snapshot.data!.docs.where((doc) {
           final data = doc.data() as Map<String, dynamic>;
           final requestDistrict = data['district'] as String?;
+          final status = data['status'] as String? ?? 'pending';
+
+          // Filter by status (case-insensitive)
+          if (status.toLowerCase() != 'pending') return false;
 
           if (_selectedDistrictFilter == 'All') return true;
 
           // If filtering by district, match exact district
-          // Also handle cases where requestDistrict might be null (show only if 'All' is selected, which is handled above)
           return requestDistrict == _selectedDistrictFilter;
         }).toList();
 
