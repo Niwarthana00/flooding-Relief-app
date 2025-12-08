@@ -184,8 +184,8 @@ class _VolunteerDashboardState extends State<VolunteerDashboard> {
       body: _selectedIndex == 0
           ? _buildHomeTab()
           : _selectedIndex == 1
-          ? const Center(child: Text("Active Requests List")) // Placeholder
-          : const Center(child: Text("History List")), // Placeholder
+          ? _buildActiveRequestsTab()
+          : _buildHistoryTab(),
       bottomNavigationBar: BottomNavigationBar(
         currentIndex: _selectedIndex,
         onTap: _onItemTapped,
@@ -614,6 +614,137 @@ class _VolunteerDashboardState extends State<VolunteerDashboard> {
           }, childCount: docs.length),
         );
       },
+    );
+  }
+
+  Widget _buildActiveRequestsTab() {
+    return Scaffold(
+      appBar: AppBar(
+        title: const Text(
+          'Active Requests',
+          style: TextStyle(
+            color: AppColors.textDark,
+            fontWeight: FontWeight.bold,
+          ),
+        ),
+        backgroundColor: Colors.white,
+        elevation: 0,
+        automaticallyImplyLeading: false,
+      ),
+      body: StreamBuilder<QuerySnapshot>(
+        stream: FirebaseFirestore.instance
+            .collection('requests')
+            .where('volunteerId', isEqualTo: currentUser?.uid)
+            .where('status', whereIn: ['assigned', 'arriving'])
+            .snapshots(),
+        builder: (context, snapshot) {
+          if (snapshot.hasError) {
+            return Center(child: Text("Error: ${snapshot.error}"));
+          }
+          if (snapshot.connectionState == ConnectionState.waiting) {
+            return const Center(child: CircularProgressIndicator());
+          }
+          if (!snapshot.hasData || snapshot.data!.docs.isEmpty) {
+            return const Center(
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Icon(Icons.assignment_outlined, size: 64, color: Colors.grey),
+                  SizedBox(height: 16),
+                  Text(
+                    "No active requests",
+                    style: TextStyle(fontSize: 18, color: Colors.grey),
+                  ),
+                ],
+              ),
+            );
+          }
+
+          final docs = snapshot.data!.docs;
+          return ListView.builder(
+            padding: const EdgeInsets.all(16),
+            itemCount: docs.length,
+            itemBuilder: (context, index) {
+              final doc = docs[index];
+              final data = doc.data() as Map<String, dynamic>;
+              return Padding(
+                padding: const EdgeInsets.only(bottom: 16.0),
+                child: _ActiveRequestCard(
+                  data: data,
+                  requestId: doc.id,
+                  currentPosition: _currentPosition,
+                ),
+              );
+            },
+          );
+        },
+      ),
+    );
+  }
+
+  Widget _buildHistoryTab() {
+    return Scaffold(
+      appBar: AppBar(
+        title: const Text(
+          'Request History',
+          style: TextStyle(
+            color: AppColors.textDark,
+            fontWeight: FontWeight.bold,
+          ),
+        ),
+        backgroundColor: Colors.white,
+        elevation: 0,
+        automaticallyImplyLeading: false,
+      ),
+      body: StreamBuilder<QuerySnapshot>(
+        stream: FirebaseFirestore.instance
+            .collection('requests')
+            .where('volunteerId', isEqualTo: currentUser?.uid)
+            .where('status', isEqualTo: 'completed')
+            .orderBy('createdAt', descending: true)
+            .snapshots(),
+        builder: (context, snapshot) {
+          if (snapshot.hasError) {
+            return Center(child: Text("Error: ${snapshot.error}"));
+          }
+          if (snapshot.connectionState == ConnectionState.waiting) {
+            return const Center(child: CircularProgressIndicator());
+          }
+          if (!snapshot.hasData || snapshot.data!.docs.isEmpty) {
+            return const Center(
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Icon(Icons.history, size: 64, color: Colors.grey),
+                  SizedBox(height: 16),
+                  Text(
+                    "No completed requests yet",
+                    style: TextStyle(fontSize: 18, color: Colors.grey),
+                  ),
+                ],
+              ),
+            );
+          }
+
+          final docs = snapshot.data!.docs;
+          return ListView.builder(
+            padding: const EdgeInsets.all(16),
+            itemCount: docs.length,
+            itemBuilder: (context, index) {
+              final doc = docs[index];
+              final data = doc.data() as Map<String, dynamic>;
+              return Padding(
+                padding: const EdgeInsets.only(bottom: 16.0),
+                child: _AvailableRequestCard(
+                  data: data,
+                  requestId: doc.id,
+                  currentPosition: _currentPosition,
+                ),
+              );
+            },
+          );
+        },
+      ),
     );
   }
 }
