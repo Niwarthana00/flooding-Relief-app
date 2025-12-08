@@ -1,12 +1,25 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
+import 'package:sahana/core/services/notification_service.dart';
 import 'package:sahana/features/auth/screens/beneficiary_registration_screen.dart';
 import 'package:sahana/features/auth/screens/role_selection_screen.dart';
 import 'package:sahana/features/dashboard/screens/beneficiary_dashboard.dart';
 
-class AuthWrapper extends StatelessWidget {
+class AuthWrapper extends StatefulWidget {
   const AuthWrapper({super.key});
+
+  @override
+  State<AuthWrapper> createState() => _AuthWrapperState();
+}
+
+class _AuthWrapperState extends State<AuthWrapper> {
+  @override
+  void initState() {
+    super.initState();
+    // Initialize Notification Service after the app is mounted
+    NotificationService().initialize();
+  }
 
   @override
   Widget build(BuildContext context) {

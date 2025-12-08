@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
@@ -52,11 +53,83 @@ class _VolunteerDashboardState extends State<VolunteerDashboard> {
     'Vavuniya',
   ];
 
+  StreamSubscription<QuerySnapshot>? _activeRequestSubscription;
+  StreamSubscription<Position>? _positionStreamSubscription;
+  String? _currentTrackingRequestId;
+
   @override
   void initState() {
     super.initState();
     _getCurrentLocation();
     _fetchVolunteerProfile();
+    _startListeningForActiveRequests();
+  }
+
+  @override
+  void dispose() {
+    _activeRequestSubscription?.cancel();
+    _positionStreamSubscription?.cancel();
+    super.dispose();
+  }
+
+  void _startListeningForActiveRequests() {
+    if (currentUser == null) return;
+
+    _activeRequestSubscription = FirebaseFirestore.instance
+        .collection('requests')
+        .where('volunteerId', isEqualTo: currentUser!.uid)
+        .where('status', whereIn: ['assigned', 'arriving'])
+        .limit(1)
+        .snapshots()
+        .listen((snapshot) {
+          if (snapshot.docs.isNotEmpty) {
+            final doc = snapshot.docs.first;
+            _startLocationTracking(doc.id);
+          } else {
+            _stopLocationTracking();
+          }
+        });
+  }
+
+  void _startLocationTracking(String requestId) {
+    if (_currentTrackingRequestId == requestId &&
+        _positionStreamSubscription != null) {
+      return; // Already tracking this request
+    }
+
+    _currentTrackingRequestId = requestId;
+    _positionStreamSubscription?.cancel();
+
+    const LocationSettings locationSettings = LocationSettings(
+      accuracy: LocationAccuracy.high,
+      distanceFilter: 10, // Update every 10 meters
+    );
+
+    _positionStreamSubscription =
+        Geolocator.getPositionStream(locationSettings: locationSettings).listen(
+          (Position position) {
+            setState(() {
+              _currentPosition = position;
+            });
+
+            // Update Firestore
+            FirebaseFirestore.instance
+                .collection('requests')
+                .doc(requestId)
+                .update({
+                  'volunteerLocation': GeoPoint(
+                    position.latitude,
+                    position.longitude,
+                  ),
+                });
+          },
+        );
+  }
+
+  void _stopLocationTracking() {
+    _currentTrackingRequestId = null;
+    _positionStreamSubscription?.cancel();
+    _positionStreamSubscription = null;
   }
 
   Future<void> _fetchVolunteerProfile() async {

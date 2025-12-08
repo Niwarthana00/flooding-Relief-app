@@ -16,7 +16,8 @@ class RequestDetailScreen extends StatelessWidget {
   });
 
   Future<void> _launchCaller(String phoneNumber) async {
-    final Uri launchUri = Uri(scheme: 'tel', path: phoneNumber);
+    final cleanNumber = phoneNumber.replaceAll(RegExp(r'[^\d+]'), '');
+    final Uri launchUri = Uri(scheme: 'tel', path: cleanNumber);
     if (await canLaunchUrl(launchUri)) {
       await launchUrl(launchUri);
     }
