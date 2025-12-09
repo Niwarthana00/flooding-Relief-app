@@ -12,6 +12,7 @@ import 'package:provider/provider.dart';
 import 'package:sahana/core/providers/locale_provider.dart';
 import 'package:sahana/l10n/app_localizations.dart';
 import 'package:sahana/features/profile/screens/edit_profile_screen.dart';
+import 'package:sahana/features/notifications/screens/notification_screen.dart';
 
 class BeneficiaryDashboard extends StatefulWidget {
   const BeneficiaryDashboard({super.key});
@@ -431,16 +432,69 @@ class _HomeTabState extends State<_HomeTab> {
                                 ],
                               ),
                             ),
-                            IconButton(
-                              onPressed: () {},
-                              icon: const Icon(
-                                Icons.notifications_outlined,
-                                color: Colors.white,
-                              ),
-                              style: IconButton.styleFrom(
-                                backgroundColor: Colors.white24,
-                                shape: const CircleBorder(),
-                              ),
+                            StreamBuilder<QuerySnapshot>(
+                              stream: FirebaseFirestore.instance
+                                  .collection('users')
+                                  .doc(user?.uid)
+                                  .collection('notifications')
+                                  .where('isRead', isEqualTo: false)
+                                  .snapshots(),
+                              builder: (context, snapshot) {
+                                final unreadCount = snapshot.hasData
+                                    ? snapshot.data!.docs.length
+                                    : 0;
+
+                                return Stack(
+                                  children: [
+                                    IconButton(
+                                      onPressed: () {
+                                        Navigator.push(
+                                          context,
+                                          MaterialPageRoute(
+                                            builder: (context) =>
+                                                const NotificationScreen(),
+                                          ),
+                                        );
+                                      },
+                                      icon: const Icon(
+                                        Icons.notifications_outlined,
+                                        color: Colors.white,
+                                      ),
+                                      style: IconButton.styleFrom(
+                                        backgroundColor: Colors.white24,
+                                        shape: const CircleBorder(),
+                                      ),
+                                    ),
+                                    if (unreadCount > 0)
+                                      Positioned(
+                                        right: 8,
+                                        top: 8,
+                                        child: Container(
+                                          padding: const EdgeInsets.all(4),
+                                          decoration: const BoxDecoration(
+                                            color: Colors.red,
+                                            shape: BoxShape.circle,
+                                          ),
+                                          constraints: const BoxConstraints(
+                                            minWidth: 16,
+                                            minHeight: 16,
+                                          ),
+                                          child: Text(
+                                            unreadCount > 9
+                                                ? '9+'
+                                                : unreadCount.toString(),
+                                            style: const TextStyle(
+                                              color: Colors.white,
+                                              fontSize: 10,
+                                              fontWeight: FontWeight.bold,
+                                            ),
+                                            textAlign: TextAlign.center,
+                                          ),
+                                        ),
+                                      ),
+                                  ],
+                                );
+                              },
                             ),
                             const SizedBox(width: 8),
                             IconButton(
@@ -1046,7 +1100,14 @@ class _ProfileTab extends StatelessWidget {
                     _buildProfileItem(
                       Icons.notifications_outlined,
                       'Notifications',
-                      () {},
+                      () {
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (context) => const NotificationScreen(),
+                          ),
+                        );
+                      },
                     ),
                     _buildProfileItem(
                       Icons.settings_outlined,
