@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:flutter_map/flutter_map.dart';
-import 'package:latlong2/latlong.dart';
+import 'package:google_maps_flutter/google_maps_flutter.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:sahana/core/theme/app_colors.dart';
 
@@ -19,6 +18,28 @@ class TrackingScreen extends StatefulWidget {
 }
 
 class _TrackingScreenState extends State<TrackingScreen> {
+  GoogleMapController? _mapController;
+  BitmapDescriptor? _volunteerIcon;
+  BitmapDescriptor? _destinationIcon;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadCustomMarkers();
+  }
+
+  Future<void> _loadCustomMarkers() async {
+    // You can load custom icons here if you have assets
+    // For now we use default markers with different hues
+    _volunteerIcon = BitmapDescriptor.defaultMarkerWithHue(
+      BitmapDescriptor.hueBlue,
+    );
+    _destinationIcon = BitmapDescriptor.defaultMarkerWithHue(
+      BitmapDescriptor.hueRed,
+    );
+    setState(() {});
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -51,31 +72,19 @@ class _TrackingScreenState extends State<TrackingScreen> {
             );
           }
 
-          final markers = <Marker>[];
+          final markers = <Marker>{};
 
           // Delivery Location Marker (Destination)
           if (widget.deliveryLocation != null) {
             markers.add(
               Marker(
-                point: LatLng(
+                markerId: const MarkerId('destination'),
+                position: LatLng(
                   widget.deliveryLocation!.latitude,
                   widget.deliveryLocation!.longitude,
                 ),
-                width: 80,
-                height: 80,
-                child: const Column(
-                  children: [
-                    Icon(Icons.location_on, color: Colors.red, size: 40),
-                    Text(
-                      'Destination',
-                      style: TextStyle(
-                        color: Colors.black,
-                        fontWeight: FontWeight.bold,
-                        backgroundColor: Colors.white,
-                      ),
-                    ),
-                  ],
-                ),
+                infoWindow: const InfoWindow(title: 'Destination'),
+                icon: _destinationIcon ?? BitmapDescriptor.defaultMarker,
               ),
             );
           }
@@ -84,27 +93,22 @@ class _TrackingScreenState extends State<TrackingScreen> {
           if (volunteerGeo != null) {
             markers.add(
               Marker(
-                point: LatLng(volunteerGeo.latitude, volunteerGeo.longitude),
-                width: 80,
-                height: 80,
-                child: const Icon(
-                  Icons.directions_car, // Vehicle Icon
-                  color: Colors.blue,
-                  size: 40,
-                ),
+                markerId: const MarkerId('volunteer'),
+                position: LatLng(volunteerGeo.latitude, volunteerGeo.longitude),
+                infoWindow: const InfoWindow(title: 'Volunteer'),
+                icon: _volunteerIcon ?? BitmapDescriptor.defaultMarker,
               ),
             );
           }
 
-          return FlutterMap(
-            options: MapOptions(initialCenter: center, initialZoom: 14.0),
-            children: [
-              TileLayer(
-                urlTemplate: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
-                userAgentPackageName: 'com.example.sahana',
-              ),
-              MarkerLayer(markers: markers),
-            ],
+          return GoogleMap(
+            initialCameraPosition: CameraPosition(target: center, zoom: 14.0),
+            markers: markers,
+            onMapCreated: (GoogleMapController controller) {
+              _mapController = controller;
+            },
+            myLocationEnabled: true,
+            myLocationButtonEnabled: true,
           );
         },
       ),
