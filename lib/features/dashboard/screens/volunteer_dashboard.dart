@@ -404,29 +404,6 @@ class _VolunteerDashboardState extends State<VolunteerDashboard> {
                   );
                 },
               ),
-              const SizedBox(width: 8),
-              IconButton(
-                onPressed: () async {
-                  await AuthService().signOut();
-                  if (mounted) {
-                    Navigator.pushAndRemoveUntil(
-                      context,
-                      MaterialPageRoute(
-                        builder: (_) => const RoleSelectionScreen(),
-                      ),
-                      (route) => false,
-                    );
-                  }
-                },
-                icon: Container(
-                  padding: const EdgeInsets.all(8),
-                  decoration: BoxDecoration(
-                    color: Colors.white.withOpacity(0.2),
-                    shape: BoxShape.circle,
-                  ),
-                  child: const Icon(Icons.logout, color: Colors.white),
-                ),
-              ),
             ],
           ),
           const SizedBox(height: 24),

@@ -513,41 +513,6 @@ class _HomeTabState extends State<_HomeTab> {
                                             ),
                                             textAlign: TextAlign.center,
                                           ),
-                                        ),
-                                      ),
-                                  ],
-                                );
-                              },
-                            ),
-
-                            IconButton(
-                              onPressed: () async {
-                                await AuthService().signOut();
-                                if (context.mounted) {
-                                  Navigator.pushAndRemoveUntil(
-                                    context,
-                                    MaterialPageRoute(
-                                      builder: (_) =>
-                                          const RoleSelectionScreen(),
-                                    ),
-                                    (route) => false,
-                                  );
-                                }
-                              },
-                              icon: const Icon(
-                                Icons.logout_rounded,
-                                color: Colors.white,
-                              ),
-                              style: IconButton.styleFrom(
-                                backgroundColor: Colors.white24,
-                                shape: const CircleBorder(),
-                              ),
-                            ),
-                          ],
-                        ),
-                      ],
-                    ),
-                  ),
 
                   // Body Content
                   Padding(
