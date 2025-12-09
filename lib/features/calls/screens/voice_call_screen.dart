@@ -1,19 +1,25 @@
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:sahana/core/services/voice_call_service.dart';
 import 'package:sahana/core/theme/app_colors.dart';
-import 'package:agora_rtc_engine/agora_rtc_engine.dart';
 import 'dart:async';
+import 'package:sahana/features/calls/services/call_signaling_service.dart';
 
 class VoiceCallScreen extends StatefulWidget {
   final String channelName;
   final String otherUserName;
   final bool isOutgoing;
+  final String? callId;
+  final String? receiverId; // Required if isOutgoing is true
 
   const VoiceCallScreen({
     super.key,
     required this.channelName,
     required this.otherUserName,
     this.isOutgoing = true,
+    this.callId,
+    this.receiverId,
   });
 
   @override
@@ -22,19 +28,65 @@ class VoiceCallScreen extends StatefulWidget {
 
 class _VoiceCallScreenState extends State<VoiceCallScreen> {
   final VoiceCallService _callService = VoiceCallService();
+  final CallSignalingService _signalingService = CallSignalingService();
+  String? _currentCallId;
+  StreamSubscription<DocumentSnapshot>? _callStatusSubscription;
+
   bool _isMuted = false;
   bool _isSpeakerOn = true;
   bool _isUserJoined = false;
   int _callDuration = 0;
   Timer? _timer;
+  bool _isCallEnded = false;
 
   @override
   void initState() {
     super.initState();
+    _currentCallId = widget.callId;
     _initializeCall();
   }
 
   Future<void> _initializeCall() async {
+    final user = FirebaseAuth.instance.currentUser;
+    if (user == null) return;
+
+    // If outgoing, create call document
+    if (widget.isOutgoing) {
+      if (widget.receiverId == null) {
+        debugPrint('Receiver ID is null for outgoing call');
+        return;
+      }
+      try {
+        _currentCallId = await _signalingService.makeCall(
+          callerId: user.uid,
+          callerName: user.displayName ?? 'Unknown',
+          receiverId: widget.receiverId!,
+          channelName: widget.channelName,
+        );
+      } catch (e) {
+        debugPrint('Error creating call: $e');
+        if (mounted) Navigator.pop(context);
+        return;
+      }
+    }
+
+    // Listen to call status
+    if (_currentCallId != null) {
+      _callStatusSubscription = _signalingService
+          .listenToCallStatus(_currentCallId!)
+          .listen((snapshot) {
+            if (!snapshot.exists) {
+              _endCall();
+              return;
+            }
+            final data = snapshot.data() as Map<String, dynamic>;
+            final status = data['status'];
+            if (status == 'ended' || status == 'declined') {
+              _endCall();
+            }
+          });
+    }
+
     await _callService.initialize();
 
     // Register event handlers
@@ -89,7 +141,73 @@ class _VoiceCallScreenState extends State<VoiceCallScreen> {
   }
 
   Future<void> _endCall() async {
+    if (_isCallEnded) return;
+    _isCallEnded = true;
+
     _timer?.cancel();
+    _callStatusSubscription?.cancel();
+
+    final user = FirebaseAuth.instance.currentUser;
+    if (user != null) {
+      final durationStr = _formatDuration(_callDuration);
+
+      if (widget.isOutgoing) {
+        if (_isUserJoined) {
+          // Log Outgoing Call to Self
+          await _signalingService.logNotification(
+            userId: user.uid,
+            title: 'Outgoing Call',
+            body: 'Call with ${widget.otherUserName}: $durationStr',
+            type: 'call_log',
+          );
+          // Log Incoming Call to Receiver (so they see duration)
+          if (widget.receiverId != null) {
+            await _signalingService.logNotification(
+              userId: widget.receiverId!,
+              title: 'Incoming Call',
+              body:
+                  'Call with ${user.displayName ?? 'Volunteer'}: $durationStr',
+              type: 'call_log',
+            );
+          }
+        } else {
+          // Log Missed Call to Receiver
+          if (widget.receiverId != null) {
+            await _signalingService.logNotification(
+              userId: widget.receiverId!,
+              title: 'Missed Call',
+              body: 'You missed a call from ${user.displayName ?? 'Volunteer'}',
+              type: 'missed_call',
+            );
+          }
+        }
+      } else {
+        // Receiver Side
+        // We rely on Caller to log the "Incoming Call" duration to us to avoid duplicates.
+        // But if Caller crashes, we might miss it.
+        // Let's log to self just in case, but checking if we want duplicates?
+        // Actually, if both log to self, it's safer.
+        // Let's change strategy: EVERYONE LOGS TO SELF.
+        // Caller logs to Self. Receiver logs to Self.
+        // EXCEPT Missed Call: Caller logs to Receiver.
+
+        if (_isUserJoined) {
+          // Log Incoming Call to Self
+          await _signalingService.logNotification(
+            userId: user.uid,
+            title: 'Incoming Call',
+            body: 'Call with ${widget.otherUserName}: $durationStr',
+            type: 'call_log',
+          );
+        }
+      }
+    }
+
+    // Update status to ended if we have a call ID
+    if (_currentCallId != null) {
+      await _signalingService.endCall(callId: _currentCallId!);
+    }
+
     await _callService.leaveCall();
     if (mounted) {
       Navigator.of(context).pop();
@@ -99,6 +217,8 @@ class _VoiceCallScreenState extends State<VoiceCallScreen> {
   @override
   void dispose() {
     _timer?.cancel();
+    _callStatusSubscription?.cancel();
+    _callService.leaveCall();
     super.dispose();
   }
 
@@ -143,7 +263,7 @@ class _VoiceCallScreenState extends State<VoiceCallScreen> {
                   ? _formatDuration(_callDuration)
                   : widget.isOutgoing
                   ? 'Calling...'
-                  : 'Incoming call...',
+                  : 'Connecting...',
               style: TextStyle(
                 color: Colors.white.withOpacity(0.8),
                 fontSize: 16,

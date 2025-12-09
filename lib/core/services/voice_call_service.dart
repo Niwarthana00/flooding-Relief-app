@@ -1,6 +1,7 @@
 import 'package:agora_rtc_engine/agora_rtc_engine.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'package:sahana/core/config/agora_config.dart';
+import 'package:flutter/foundation.dart';
 
 class VoiceCallService {
   static final VoiceCallService _instance = VoiceCallService._internal();
@@ -88,13 +89,13 @@ class VoiceCallService {
     _engine!.registerEventHandler(
       RtcEngineEventHandler(
         onJoinChannelSuccess: (RtcConnection connection, int elapsed) {
-          print('Successfully joined channel: ${connection.channelId}');
+          debugPrint('Successfully joined channel: ${connection.channelId}');
         },
         onUserJoined: onUserJoined,
         onUserOffline: onUserOffline,
         onLeaveChannel: onLeaveChannel,
         onError: (ErrorCodeType err, String msg) {
-          print('Agora Error: $err - $msg');
+          debugPrint('Agora Error: $err - $msg');
         },
       ),
     );

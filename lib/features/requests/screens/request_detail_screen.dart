@@ -431,12 +431,20 @@ class RequestDetailScreen extends StatelessWidget {
                   onPressed: () {
                     // Start in-app voice call
                     final channelName = AgoraConfig.getChannelName(requestId);
+                    final currentUserId =
+                        FirebaseAuth.instance.currentUser?.uid;
+                    final receiverId =
+                        currentUserId == requestData['volunteerId']
+                        ? requestData['userId']
+                        : requestData['volunteerId'];
+
                     Navigator.push(
                       context,
                       MaterialPageRoute(
                         builder: (context) => VoiceCallScreen(
                           channelName: channelName,
                           otherUserName: name,
+                          receiverId: receiverId,
                           isOutgoing: true,
                         ),
                       ),

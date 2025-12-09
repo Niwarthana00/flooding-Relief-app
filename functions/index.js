@@ -150,19 +150,41 @@ exports.sendChatNotification = functions.firestore
             console.log("Chat notification sent successfully");
 
             // Save to in-app notifications
-            await admin.firestore()
+            const notificationsRef = admin.firestore()
                 .collection("users")
                 .doc(receiverId)
-                .collection("notifications")
-                .add({
+                .collection("notifications");
+
+            // Check for existing unread chat notification from this sender
+            const existingSnapshot = await notificationsRef
+                .where("type", "==", "chat")
+                .where("senderId", "==", senderId)
+                .where("isRead", "==", false)
+                .limit(1)
+                .get();
+
+            if (!existingSnapshot.empty) {
+                // Update existing notification
+                const docId = existingSnapshot.docs[0].id;
+                await notificationsRef.doc(docId).update({
+                    title: `New messages from ${senderName}`,
+                    body: "You have new messages.",
+                    createdAt: admin.firestore.FieldValue.serverTimestamp(),
+                });
+                console.log("Updated existing chat notification");
+            } else {
+                // Create new notification
+                await notificationsRef.add({
                     title: `New message from ${senderName}`,
-                    body: messageText,
+                    body: "You have a new message.",
                     type: "chat",
                     requestId: context.params.requestId,
                     senderId: senderId,
                     isRead: false,
                     createdAt: admin.firestore.FieldValue.serverTimestamp(),
                 });
+                console.log("Created new chat notification");
+            }
             console.log("Chat notification saved to Firestore");
 
 

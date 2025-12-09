@@ -440,9 +440,32 @@ class _HomeTabState extends State<_HomeTab> {
                                   .where('isRead', isEqualTo: false)
                                   .snapshots(),
                               builder: (context, snapshot) {
-                                final unreadCount = snapshot.hasData
-                                    ? snapshot.data!.docs.length
-                                    : 0;
+                                int unreadCount = 0;
+                                if (snapshot.hasData) {
+                                  final docs = snapshot.data!.docs;
+                                  final chatNotifications = docs.where((doc) {
+                                    final data =
+                                        doc.data() as Map<String, dynamic>;
+                                    return data['type'] == 'chat';
+                                  });
+                                  final otherNotifications = docs.where((doc) {
+                                    final data =
+                                        doc.data() as Map<String, dynamic>;
+                                    return data['type'] != 'chat';
+                                  });
+
+                                  final uniqueChatSenders = chatNotifications
+                                      .map((doc) {
+                                        final data =
+                                            doc.data() as Map<String, dynamic>;
+                                        return data['senderId'];
+                                      })
+                                      .toSet();
+
+                                  unreadCount =
+                                      uniqueChatSenders.length +
+                                      otherNotifications.length;
+                                }
 
                                 return Stack(
                                   children: [
@@ -496,7 +519,7 @@ class _HomeTabState extends State<_HomeTab> {
                                 );
                               },
                             ),
-                            const SizedBox(width: 8),
+
                             IconButton(
                               onPressed: () async {
                                 await AuthService().signOut();

@@ -6,6 +6,7 @@ import 'package:sahana/features/auth/screens/auth_wrapper.dart';
 import 'package:sahana/l10n/app_localizations.dart';
 import 'package:sahana/core/providers/locale_provider.dart';
 import 'package:sahana/core/services/notification_service.dart';
+import 'package:sahana/features/calls/widgets/call_listener_wrapper.dart';
 
 final GlobalKey<NavigatorState> navigatorKey = GlobalKey<NavigatorState>();
 
@@ -42,6 +43,9 @@ class MyApp extends StatelessWidget {
           locale: localeProvider.locale,
           localizationsDelegates: AppLocalizations.localizationsDelegates,
           supportedLocales: AppLocalizations.supportedLocales,
+          builder: (context, child) {
+            return CallListenerWrapper(child: child!);
+          },
           home: Builder(
             builder: (context) {
               // Set context for notification service
