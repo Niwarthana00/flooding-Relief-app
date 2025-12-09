@@ -82,10 +82,9 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
 
         // Upload image if selected
         if (_imageFile != null) {
-          final storageRef = FirebaseStorage.instance
-              .ref()
-              .child('user_profiles')
-              .child('${user.uid}.jpg');
+          final storageRef = FirebaseStorage.instanceFor(
+            bucket: 'gs://sahana-9babf.firebasestorage.app',
+          ).ref().child('user_profiles').child('${user.uid}.jpg');
 
           await storageRef.putFile(_imageFile!);
           photoURL = await storageRef.getDownloadURL();

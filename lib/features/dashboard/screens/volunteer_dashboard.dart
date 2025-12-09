@@ -22,7 +22,6 @@ class VolunteerDashboard extends StatefulWidget {
 
 class _VolunteerDashboardState extends State<VolunteerDashboard> {
   final User? currentUser = FirebaseAuth.instance.currentUser;
-  bool isAvailable = true;
   int _selectedIndex = 0;
   String? _volunteerDistrict;
   String _selectedDistrictFilter = 'All';
@@ -167,18 +166,6 @@ class _VolunteerDashboardState extends State<VolunteerDashboard> {
     setState(() {
       _selectedIndex = index;
     });
-  }
-
-  Future<void> _toggleAvailability(bool value) async {
-    setState(() {
-      isAvailable = value;
-    });
-    if (currentUser != null) {
-      await FirebaseFirestore.instance
-          .collection('users')
-          .doc(currentUser!.uid)
-          .update({'isAvailable': value});
-    }
   }
 
   @override
@@ -392,56 +379,6 @@ class _VolunteerDashboardState extends State<VolunteerDashboard> {
             ],
           ),
           const SizedBox(height: 24),
-          Container(
-            padding: const EdgeInsets.all(16),
-            decoration: BoxDecoration(
-              color: Colors.white.withOpacity(0.15),
-              borderRadius: BorderRadius.circular(16),
-              border: Border.all(color: Colors.white.withOpacity(0.2)),
-            ),
-            child: Row(
-              children: [
-                Container(
-                  width: 12,
-                  height: 12,
-                  decoration: BoxDecoration(
-                    color: isAvailable ? const Color(0xFF10B981) : Colors.grey,
-                    shape: BoxShape.circle,
-                  ),
-                ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      const Text(
-                        'Availability Status',
-                        style: TextStyle(
-                          color: Colors.white,
-                          fontWeight: FontWeight.bold,
-                        ),
-                      ),
-                      Text(
-                        isAvailable
-                            ? 'Available for requests'
-                            : 'Not accepting requests',
-                        style: const TextStyle(
-                          color: Colors.white70,
-                          fontSize: 12,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-                Switch(
-                  value: isAvailable,
-                  onChanged: _toggleAvailability,
-                  activeColor: Colors.white,
-                  activeTrackColor: const Color(0xFF10B981),
-                ),
-              ],
-            ),
-          ),
         ],
       ),
     );
@@ -812,22 +749,33 @@ class _VolunteerDashboardState extends State<VolunteerDashboard> {
                         Positioned(
                           bottom: 0,
                           right: 0,
-                          child: Container(
-                            padding: const EdgeInsets.all(4),
-                            decoration: const BoxDecoration(
-                              color: Colors.white,
-                              shape: BoxShape.circle,
-                            ),
+                          child: GestureDetector(
+                            onTap: () {
+                              Navigator.push(
+                                context,
+                                MaterialPageRoute(
+                                  builder: (context) =>
+                                      const EditProfileScreen(),
+                                ),
+                              );
+                            },
                             child: Container(
-                              padding: const EdgeInsets.all(8),
+                              padding: const EdgeInsets.all(4),
                               decoration: const BoxDecoration(
-                                color: AppColors.primaryBlue,
+                                color: Colors.white,
                                 shape: BoxShape.circle,
                               ),
-                              child: const Icon(
-                                Icons.camera_alt,
-                                color: Colors.white,
-                                size: 16,
+                              child: Container(
+                                padding: const EdgeInsets.all(8),
+                                decoration: const BoxDecoration(
+                                  color: AppColors.primaryBlue,
+                                  shape: BoxShape.circle,
+                                ),
+                                child: const Icon(
+                                  Icons.camera_alt,
+                                  color: Colors.white,
+                                  size: 16,
+                                ),
                               ),
                             ),
                           ),
