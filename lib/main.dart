@@ -5,10 +5,12 @@ import 'package:sahana/core/theme/app_colors.dart';
 import 'package:sahana/features/auth/screens/auth_wrapper.dart';
 import 'package:sahana/l10n/app_localizations.dart';
 import 'package:sahana/core/providers/locale_provider.dart';
+import 'package:sahana/core/services/notification_service.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await Firebase.initializeApp();
+  await NotificationService().initialize();
   runApp(
     MultiProvider(
       providers: [ChangeNotifierProvider(create: (_) => LocaleProvider())],
