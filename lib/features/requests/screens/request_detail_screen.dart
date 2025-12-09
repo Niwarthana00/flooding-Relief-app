@@ -3,6 +3,7 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:sahana/core/theme/app_colors.dart';
 import 'package:sahana/features/requests/screens/tracking_screen.dart';
+import 'package:sahana/features/chat/screens/chat_screen.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 class RequestDetailScreen extends StatelessWidget {
@@ -64,13 +65,21 @@ class RequestDetailScreen extends StatelessWidget {
             const SizedBox(height: 16),
 
             // Volunteer Card (Only if assigned)
-            if (volunteerName != null ||
+            // Contact Card
+            if (FirebaseAuth.instance.currentUser?.uid ==
+                requestData['volunteerId'])
+              _buildBeneficiaryContactCard(context)
+            else if (volunteerName != null ||
                 [
                   'assigned',
                   'arriving',
                   'completed',
                 ].contains(status.toLowerCase()))
-              _buildVolunteerCard(volunteerName ?? 'Volunteer', volunteerPhone),
+              _buildVolunteerCard(
+                context,
+                volunteerName ?? 'Volunteer',
+                volunteerPhone,
+              ),
 
             if (volunteerName != null) const SizedBox(height: 16),
 
@@ -231,7 +240,7 @@ class RequestDetailScreen extends StatelessWidget {
     );
   }
 
-  Widget _buildVolunteerCard(String name, String phone) {
+  Widget _buildVolunteerCard(BuildContext context, String name, String phone) {
     return Container(
       padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
@@ -307,7 +316,133 @@ class RequestDetailScreen extends StatelessWidget {
               const SizedBox(width: 12),
               Expanded(
                 child: ElevatedButton.icon(
-                  onPressed: () {}, // TODO: Implement chat
+                  onPressed: () {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (context) => ChatScreen(
+                          requestId: requestId,
+                          otherUserName: name,
+                          otherUserId: requestData['volunteerId'],
+                        ),
+                      ),
+                    );
+                  },
+                  icon: const Icon(Icons.chat_bubble_outline, size: 18),
+                  label: const Text('Chat'),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: const Color(0xFF2563EB),
+                    foregroundColor: Colors.white,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    padding: const EdgeInsets.symmetric(vertical: 12),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildBeneficiaryContactCard(BuildContext context) {
+    final name = requestData['userName'] ?? 'Beneficiary';
+    // Note: Beneficiary phone might not be in requestData.
+    // Ideally it should be fetched or stored. For now we use a placeholder or check if it exists.
+    final phone = requestData['userPhone'] ?? '';
+
+    return Container(
+      padding: const EdgeInsets.all(20),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.05),
+            blurRadius: 10,
+            offset: const Offset(0, 4),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Text(
+            'Beneficiary Information',
+            style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+          ),
+          const SizedBox(height: 16),
+          Row(
+            children: [
+              CircleAvatar(
+                radius: 24,
+                backgroundColor: Colors.orange,
+                child: Text(
+                  name.isNotEmpty ? name[0].toUpperCase() : 'B',
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+              ),
+              const SizedBox(width: 16),
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    name,
+                    style: const TextStyle(
+                      fontWeight: FontWeight.bold,
+                      fontSize: 16,
+                      color: AppColors.textDark,
+                    ),
+                  ),
+                  if (phone.isNotEmpty)
+                    Text(
+                      phone,
+                      style: const TextStyle(color: Colors.grey, fontSize: 14),
+                    ),
+                ],
+              ),
+            ],
+          ),
+          const SizedBox(height: 20),
+          Row(
+            children: [
+              if (phone.isNotEmpty) ...[
+                Expanded(
+                  child: ElevatedButton.icon(
+                    onPressed: () => _launchCaller(phone),
+                    icon: const Icon(Icons.call, size: 18),
+                    label: const Text('Call'),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: const Color(0xFF10B981),
+                      foregroundColor: Colors.white,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      padding: const EdgeInsets.symmetric(vertical: 12),
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 12),
+              ],
+              Expanded(
+                child: ElevatedButton.icon(
+                  onPressed: () {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (context) => ChatScreen(
+                          requestId: requestId,
+                          otherUserName: name,
+                          otherUserId: requestData['userId'],
+                        ),
+                      ),
+                    );
+                  },
                   icon: const Icon(Icons.chat_bubble_outline, size: 18),
                   label: const Text('Chat'),
                   style: ElevatedButton.styleFrom(

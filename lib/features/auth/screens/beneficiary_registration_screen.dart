@@ -4,6 +4,7 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:sahana/core/theme/app_colors.dart';
 import 'package:sahana/features/dashboard/screens/beneficiary_dashboard.dart';
+import 'package:sahana/core/services/notification_service.dart';
 
 class BeneficiaryRegistrationScreen extends StatefulWidget {
   const BeneficiaryRegistrationScreen({super.key});
@@ -144,6 +145,9 @@ class _BeneficiaryRegistrationScreenState
         'createdAt': FieldValue.serverTimestamp(),
         'status': 'verified', // Auto-verify for MVP
       });
+
+      // Save FCM Token
+      await NotificationService().initialize();
 
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(

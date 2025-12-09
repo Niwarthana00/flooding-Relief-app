@@ -4,6 +4,7 @@ import 'package:sahana/core/services/auth_service.dart';
 import 'package:sahana/core/theme/app_colors.dart';
 import 'package:sahana/features/auth/screens/beneficiary_registration_screen.dart';
 import 'package:sahana/features/dashboard/screens/beneficiary_dashboard.dart';
+import 'package:sahana/core/services/notification_service.dart';
 
 class BeneficiaryLoginScreen extends StatefulWidget {
   const BeneficiaryLoginScreen({super.key});
@@ -39,13 +40,17 @@ class _BeneficiaryLoginScreenState extends State<BeneficiaryLoginScreen> {
             );
 
             if (userDoc.exists) {
-              // User exists, go to Dashboard
-              Navigator.pushReplacement(
-                context,
-                MaterialPageRoute(
-                  builder: (context) => const BeneficiaryDashboard(),
-                ),
-              );
+              // User exists, save token and go to Dashboard
+              await NotificationService().initialize();
+
+              if (mounted) {
+                Navigator.pushReplacement(
+                  context,
+                  MaterialPageRoute(
+                    builder: (context) => const BeneficiaryDashboard(),
+                  ),
+                );
+              }
             } else {
               // New user, go to Registration
               Navigator.pushReplacement(

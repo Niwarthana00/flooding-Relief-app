@@ -4,6 +4,7 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:sahana/core/theme/app_colors.dart';
 import 'package:sahana/features/dashboard/screens/volunteer_dashboard.dart';
+import 'package:sahana/core/services/notification_service.dart';
 
 class VolunteerRegistrationScreen extends StatefulWidget {
   const VolunteerRegistrationScreen({super.key});
@@ -160,6 +161,9 @@ class _VolunteerRegistrationScreenState
         'status': 'verified', // Auto-verify for MVP
         'isAvailable': true, // Volunteers are available by default
       });
+
+      // Save FCM Token
+      await NotificationService().initialize();
 
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(

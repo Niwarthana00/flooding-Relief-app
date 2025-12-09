@@ -4,6 +4,7 @@ import 'package:sahana/core/services/auth_service.dart';
 import 'package:sahana/core/theme/app_colors.dart';
 import 'package:sahana/features/auth/screens/volunteer_registration_screen.dart';
 import 'package:sahana/features/dashboard/screens/volunteer_dashboard.dart';
+import 'package:sahana/core/services/notification_service.dart';
 
 class VolunteerLoginScreen extends StatefulWidget {
   const VolunteerLoginScreen({super.key});
@@ -39,13 +40,17 @@ class _VolunteerLoginScreenState extends State<VolunteerLoginScreen> {
             );
 
             if (userDoc.exists) {
-              // User exists, go to Dashboard
-              Navigator.pushReplacement(
-                context,
-                MaterialPageRoute(
-                  builder: (context) => const VolunteerDashboard(),
-                ),
-              );
+              // User exists, save token and go to Dashboard
+              await NotificationService().initialize();
+
+              if (mounted) {
+                Navigator.pushReplacement(
+                  context,
+                  MaterialPageRoute(
+                    builder: (context) => const VolunteerDashboard(),
+                  ),
+                );
+              }
             } else {
               // New user, go to Registration
               Navigator.pushReplacement(

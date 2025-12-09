@@ -52,9 +52,19 @@ class NotificationService {
     User? user = FirebaseAuth.instance.currentUser;
 
     if (user != null && fcmToken != null) {
-      await FirebaseFirestore.instance.collection('users').doc(user.uid).update(
-        {'fcmToken': fcmToken},
-      );
+      try {
+        await FirebaseFirestore.instance
+            .collection('users_tokens')
+            .doc(user.uid)
+            .set({
+              'userId': user.uid,
+              'fcmToken': fcmToken,
+              'updatedAt': FieldValue.serverTimestamp(),
+            }, SetOptions(merge: true));
+        print('FCM Token saved to users_tokens: $fcmToken');
+      } catch (e) {
+        print('Error saving FCM token: $e');
+      }
     }
   }
 

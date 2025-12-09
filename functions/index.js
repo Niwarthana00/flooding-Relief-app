@@ -17,9 +17,15 @@ exports.sendRequestStatusNotification = functions.firestore
         const status = newData.status;
         const volunteerId = newData.volunteerId;
 
-        // Get user's FCM token
-        const userDoc = await admin.firestore().collection("users").doc(userId).get();
-        const fcmToken = userDoc.data().fcmToken;
+        // Get user's FCM token from users_tokens collection
+        const tokenDoc = await admin.firestore().collection("users_tokens").doc(userId).get();
+
+        if (!tokenDoc.exists) {
+            console.log("No token document found for user", userId);
+            return null;
+        }
+
+        const fcmToken = tokenDoc.data().fcmToken;
 
         if (!fcmToken) {
             console.log("No FCM token for user", userId);
