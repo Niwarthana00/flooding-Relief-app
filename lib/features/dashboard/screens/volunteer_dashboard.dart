@@ -8,6 +8,10 @@ import 'package:sahana/core/theme/app_colors.dart';
 import 'package:sahana/features/auth/screens/role_selection_screen.dart';
 import 'package:sahana/features/requests/screens/request_detail_screen.dart';
 import 'package:url_launcher/url_launcher.dart';
+import 'package:provider/provider.dart';
+import 'package:sahana/core/providers/locale_provider.dart';
+import 'package:sahana/l10n/app_localizations.dart';
+import 'package:sahana/features/profile/screens/edit_profile_screen.dart';
 
 class VolunteerDashboard extends StatefulWidget {
   const VolunteerDashboard({super.key});
@@ -185,13 +189,16 @@ class _VolunteerDashboardState extends State<VolunteerDashboard> {
           ? _buildHomeTab()
           : _selectedIndex == 1
           ? _buildActiveRequestsTab()
-          : _buildHistoryTab(),
+          : _selectedIndex == 2
+          ? _buildHistoryTab()
+          : _buildProfileTab(),
       bottomNavigationBar: BottomNavigationBar(
         currentIndex: _selectedIndex,
         onTap: _onItemTapped,
         selectedItemColor: AppColors.primaryBlue,
         unselectedItemColor: Colors.grey,
         showUnselectedLabels: true,
+        type: BottomNavigationBarType.fixed,
         items: const [
           BottomNavigationBarItem(
             icon: Icon(Icons.location_on_outlined),
@@ -204,6 +211,10 @@ class _VolunteerDashboardState extends State<VolunteerDashboard> {
             label: 'Active',
           ),
           BottomNavigationBarItem(icon: Icon(Icons.history), label: 'History'),
+          BottomNavigationBarItem(
+            icon: Icon(Icons.person_outline_rounded),
+            label: 'Profile',
+          ),
         ],
       ),
     );
@@ -747,6 +758,274 @@ class _VolunteerDashboardState extends State<VolunteerDashboard> {
       ),
     );
   }
+
+  Widget _buildProfileTab() {
+    return StreamBuilder<DocumentSnapshot>(
+      stream: FirebaseFirestore.instance
+          .collection('users')
+          .doc(currentUser?.uid)
+          .snapshots(),
+      builder: (context, snapshot) {
+        if (!snapshot.hasData) {
+          return const Center(child: CircularProgressIndicator());
+        }
+
+        final userData = snapshot.data!.data() as Map<String, dynamic>?;
+        final name = userData?['name'] ?? 'Volunteer';
+        final email = userData?['email'] ?? currentUser?.email ?? '';
+
+        return SingleChildScrollView(
+          child: Column(
+            children: [
+              Container(
+                width: double.infinity,
+                padding: const EdgeInsets.fromLTRB(24, 60, 24, 30),
+                decoration: const BoxDecoration(
+                  color: AppColors.primaryBlue,
+                  borderRadius: BorderRadius.only(
+                    bottomLeft: Radius.circular(30),
+                    bottomRight: Radius.circular(30),
+                  ),
+                ),
+                child: Column(
+                  children: [
+                    Stack(
+                      children: [
+                        CircleAvatar(
+                          radius: 50,
+                          backgroundColor: Colors.white,
+                          child: CircleAvatar(
+                            radius: 46,
+                            backgroundColor: Colors.grey.shade200,
+                            backgroundImage: currentUser?.photoURL != null
+                                ? NetworkImage(currentUser!.photoURL!)
+                                : null,
+                            child: currentUser?.photoURL == null
+                                ? const Icon(
+                                    Icons.person,
+                                    size: 50,
+                                    color: Colors.grey,
+                                  )
+                                : null,
+                          ),
+                        ),
+                        Positioned(
+                          bottom: 0,
+                          right: 0,
+                          child: Container(
+                            padding: const EdgeInsets.all(4),
+                            decoration: const BoxDecoration(
+                              color: Colors.white,
+                              shape: BoxShape.circle,
+                            ),
+                            child: Container(
+                              padding: const EdgeInsets.all(8),
+                              decoration: const BoxDecoration(
+                                color: AppColors.primaryBlue,
+                                shape: BoxShape.circle,
+                              ),
+                              child: const Icon(
+                                Icons.camera_alt,
+                                color: Colors.white,
+                                size: 16,
+                              ),
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 16),
+                    Text(
+                      name,
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontSize: 24,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      email,
+                      style: const TextStyle(
+                        color: Colors.white70,
+                        fontSize: 14,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              Padding(
+                padding: const EdgeInsets.all(24.0),
+                child: Column(
+                  children: [
+                    _buildProfileItem(
+                      Icons.person_outline,
+                      AppLocalizations.of(context)!.editProfile,
+                      () {
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (context) => const EditProfileScreen(),
+                          ),
+                        );
+                      },
+                    ),
+                    _buildProfileItem(
+                      Icons.language,
+                      AppLocalizations.of(context)!.changeLanguage,
+                      () {
+                        _showLanguageBottomSheet(context);
+                      },
+                    ),
+                    _buildProfileItem(
+                      Icons.notifications_outlined,
+                      'Notifications',
+                      () {},
+                    ),
+                    _buildProfileItem(
+                      Icons.settings_outlined,
+                      'Settings',
+                      () {},
+                    ),
+                    _buildProfileItem(
+                      Icons.help_outline,
+                      'Help & Support',
+                      () {},
+                    ),
+                    const SizedBox(height: 24),
+                    SizedBox(
+                      width: double.infinity,
+                      child: OutlinedButton.icon(
+                        onPressed: () async {
+                          await AuthService().signOut();
+                          if (context.mounted) {
+                            Navigator.pushAndRemoveUntil(
+                              context,
+                              MaterialPageRoute(
+                                builder: (_) => const RoleSelectionScreen(),
+                              ),
+                              (route) => false,
+                            );
+                          }
+                        },
+                        icon: const Icon(Icons.logout, color: Colors.red),
+                        label: Text(
+                          AppLocalizations.of(context)!.logout,
+                          style: const TextStyle(color: Colors.red),
+                        ),
+                        style: OutlinedButton.styleFrom(
+                          side: const BorderSide(color: Colors.red),
+                          padding: const EdgeInsets.symmetric(vertical: 16),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
+  Widget _buildProfileItem(IconData icon, String title, VoidCallback onTap) {
+    return Container(
+      margin: const EdgeInsets.only(bottom: 16),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(12),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.05),
+            blurRadius: 10,
+            offset: const Offset(0, 4),
+          ),
+        ],
+      ),
+      child: ListTile(
+        leading: Container(
+          padding: const EdgeInsets.all(8),
+          decoration: BoxDecoration(
+            color: AppColors.background,
+            borderRadius: BorderRadius.circular(8),
+          ),
+          child: Icon(icon, color: AppColors.primaryGreen),
+        ),
+        title: Text(
+          title,
+          style: const TextStyle(
+            fontWeight: FontWeight.bold,
+            color: AppColors.textDark,
+          ),
+        ),
+        trailing: const Icon(
+          Icons.arrow_forward_ios,
+          size: 16,
+          color: Colors.grey,
+        ),
+        onTap: onTap,
+      ),
+    );
+  }
+
+  void _showLanguageBottomSheet(BuildContext context) {
+    showModalBottomSheet(
+      context: context,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (context) {
+        return Consumer<LocaleProvider>(
+          builder: (context, provider, child) {
+            return Container(
+              padding: const EdgeInsets.all(24),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Text(
+                    'Select Language',
+                    style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
+                  ),
+                  const SizedBox(height: 16),
+                  _buildLanguageItem(context, provider, 'English', 'en'),
+                  _buildLanguageItem(context, provider, 'සිංහල', 'si'),
+                  _buildLanguageItem(context, provider, 'தமிழ்', 'ta'),
+                ],
+              ),
+            );
+          },
+        );
+      },
+    );
+  }
+
+  Widget _buildLanguageItem(
+    BuildContext context,
+    LocaleProvider provider,
+    String name,
+    String code,
+  ) {
+    final isSelected = provider.locale.languageCode == code;
+    return ListTile(
+      leading: Text(
+        code.toUpperCase(),
+        style: const TextStyle(fontWeight: FontWeight.bold, color: Colors.grey),
+      ),
+      title: Text(name),
+      trailing: isSelected
+          ? const Icon(Icons.check_circle, color: AppColors.primaryGreen)
+          : null,
+      onTap: () {
+        provider.setLocale(Locale(code));
+        Navigator.pop(context);
+      },
+    );
+  }
 }
 
 class _StatCard extends StatelessWidget {
@@ -945,21 +1224,23 @@ class _ActiveRequestCard extends StatelessWidget {
                   overflow: TextOverflow.ellipsis,
                 ),
               ),
-              const SizedBox(width: 12),
-              const Icon(
-                Icons.directions_car_outlined,
-                size: 16,
-                color: Colors.grey,
-              ),
-              const SizedBox(width: 4),
-              Text(
-                '${distance.toStringAsFixed(1)} km',
-                style: const TextStyle(
-                  color: AppColors.primaryBlue,
-                  fontSize: 12,
-                  fontWeight: FontWeight.bold,
+              if (distance > 0) ...[
+                const SizedBox(width: 12),
+                const Icon(
+                  Icons.directions_car_outlined,
+                  size: 16,
+                  color: Colors.grey,
                 ),
-              ),
+                const SizedBox(width: 4),
+                Text(
+                  '${distance.toStringAsFixed(1)} km',
+                  style: const TextStyle(
+                    color: AppColors.primaryBlue,
+                    fontSize: 12,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+              ],
             ],
           ),
           const SizedBox(height: 20),
@@ -1085,50 +1366,57 @@ class _AvailableRequestCard extends StatelessWidget {
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                Row(
-                  children: [
-                    Container(
-                      padding: const EdgeInsets.all(10),
-                      decoration: BoxDecoration(
-                        color: const Color(0xFFF0FDF4),
-                        borderRadius: BorderRadius.circular(10),
-                      ),
-                      child: const Icon(
-                        Icons.inventory_2_outlined,
-                        color: Color(0xFF10B981),
-                        size: 20,
-                      ),
-                    ),
-                    const SizedBox(width: 12),
-                    Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          data['category'] ?? 'Request',
-                          style: const TextStyle(
-                            fontSize: 16,
-                            fontWeight: FontWeight.bold,
-                            color: AppColors.textDark,
-                          ),
+                Expanded(
+                  child: Row(
+                    children: [
+                      Container(
+                        padding: const EdgeInsets.all(10),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFFF0FDF4),
+                          borderRadius: BorderRadius.circular(10),
                         ),
-                        Text(
-                          '${data['urgency'] ?? 'Medium'} Priority',
-                          style: TextStyle(
-                            fontSize: 12,
-                            color: _getUrgencyColor(data['urgency']),
-                          ),
+                        child: const Icon(
+                          Icons.inventory_2_outlined,
+                          color: Color(0xFF10B981),
+                          size: 20,
                         ),
-                      ],
-                    ),
-                  ],
+                      ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              data['category'] ?? 'Request',
+                              style: const TextStyle(
+                                fontSize: 16,
+                                fontWeight: FontWeight.bold,
+                                color: AppColors.textDark,
+                              ),
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                            Text(
+                              '${data['urgency'] ?? 'Medium'} Priority',
+                              style: TextStyle(
+                                fontSize: 12,
+                                color: _getUrgencyColor(data['urgency']),
+                              ),
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
                 ),
+                const SizedBox(width: 8),
                 Container(
                   padding: const EdgeInsets.symmetric(
                     horizontal: 10,
                     vertical: 4,
                   ),
                   decoration: BoxDecoration(
-                    color: const Color(0xFFFEF3C7),
+                    color: _getStatusColor(data['status']),
                     borderRadius: BorderRadius.circular(12),
                   ),
                   child: Row(
@@ -1136,16 +1424,16 @@ class _AvailableRequestCard extends StatelessWidget {
                       Container(
                         width: 6,
                         height: 6,
-                        decoration: const BoxDecoration(
-                          color: Color(0xFFD97706),
+                        decoration: BoxDecoration(
+                          color: _getStatusTextColor(data['status']),
                           shape: BoxShape.circle,
                         ),
                       ),
                       const SizedBox(width: 6),
-                      const Text(
-                        'Pending',
+                      Text(
+                        (data['status'] ?? 'Pending').toString().toUpperCase(),
                         style: TextStyle(
-                          color: Color(0xFFD97706),
+                          color: _getStatusTextColor(data['status']),
                           fontSize: 12,
                           fontWeight: FontWeight.bold,
                         ),
@@ -1186,8 +1474,8 @@ class _AvailableRequestCard extends StatelessWidget {
                   _getTimeAgo(data['createdAt'] as Timestamp?),
                   style: const TextStyle(color: Colors.grey, fontSize: 12),
                 ),
-                const SizedBox(width: 12),
-                if (distance > 0) ...[
+                if (distance > 0.1) ...[
+                  const SizedBox(width: 12),
                   const Icon(
                     Icons.directions_walk,
                     size: 16,
@@ -1209,6 +1497,30 @@ class _AvailableRequestCard extends StatelessWidget {
         ),
       ),
     );
+  }
+
+  Color _getStatusColor(String? status) {
+    switch (status?.toLowerCase()) {
+      case 'completed':
+        return const Color(0xFFF0FDF4); // Green background
+      case 'assigned':
+      case 'arriving':
+        return const Color(0xFFEFF6FF); // Blue background
+      default:
+        return const Color(0xFFFEF3C7); // Orange/Yellow background
+    }
+  }
+
+  Color _getStatusTextColor(String? status) {
+    switch (status?.toLowerCase()) {
+      case 'completed':
+        return const Color(0xFF10B981); // Green text
+      case 'assigned':
+      case 'arriving':
+        return AppColors.primaryBlue; // Blue text
+      default:
+        return const Color(0xFFD97706); // Orange/Yellow text
+    }
   }
 
   Color _getUrgencyColor(String? urgency) {
