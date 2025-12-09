@@ -4,6 +4,8 @@ import 'package:flutter/material.dart';
 import 'package:sahana/core/theme/app_colors.dart';
 import 'package:sahana/features/requests/screens/tracking_screen.dart';
 import 'package:sahana/features/chat/screens/chat_screen.dart';
+import 'package:sahana/features/calls/screens/voice_call_screen.dart';
+import 'package:sahana/core/config/agora_config.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 class RequestDetailScreen extends StatelessWidget {
@@ -300,11 +302,24 @@ class RequestDetailScreen extends StatelessWidget {
             children: [
               Expanded(
                 child: ElevatedButton.icon(
-                  onPressed: () => _launchCaller(phone),
+                  onPressed: () {
+                    // Start in-app voice call
+                    final channelName = AgoraConfig.getChannelName(requestId);
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (context) => VoiceCallScreen(
+                          channelName: channelName,
+                          otherUserName: name,
+                          isOutgoing: true,
+                        ),
+                      ),
+                    );
+                  },
                   icon: const Icon(Icons.call, size: 18),
-                  label: const Text('Call'),
+                  label: const Text('Voice Call'),
                   style: ElevatedButton.styleFrom(
-                    backgroundColor: const Color(0xFF10B981),
+                    backgroundColor: AppColors.primaryBlue,
                     foregroundColor: Colors.white,
                     shape: RoundedRectangleBorder(
                       borderRadius: BorderRadius.circular(8),
@@ -411,24 +426,35 @@ class RequestDetailScreen extends StatelessWidget {
           const SizedBox(height: 20),
           Row(
             children: [
-              if (phone.isNotEmpty) ...[
-                Expanded(
-                  child: ElevatedButton.icon(
-                    onPressed: () => _launchCaller(phone),
-                    icon: const Icon(Icons.call, size: 18),
-                    label: const Text('Call'),
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: const Color(0xFF10B981),
-                      foregroundColor: Colors.white,
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(8),
+              Expanded(
+                child: ElevatedButton.icon(
+                  onPressed: () {
+                    // Start in-app voice call
+                    final channelName = AgoraConfig.getChannelName(requestId);
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (context) => VoiceCallScreen(
+                          channelName: channelName,
+                          otherUserName: name,
+                          isOutgoing: true,
+                        ),
                       ),
-                      padding: const EdgeInsets.symmetric(vertical: 12),
+                    );
+                  },
+                  icon: const Icon(Icons.call, size: 18),
+                  label: const Text('Voice Call'),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: AppColors.primaryBlue,
+                    foregroundColor: Colors.white,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(8),
                     ),
+                    padding: const EdgeInsets.symmetric(vertical: 12),
                   ),
                 ),
-                const SizedBox(width: 12),
-              ],
+              ),
+              const SizedBox(width: 12),
               Expanded(
                 child: ElevatedButton.icon(
                   onPressed: () {
