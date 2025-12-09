@@ -3,6 +3,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:sahana/core/theme/app_colors.dart';
 import 'package:intl/intl.dart';
+import 'package:sahana/features/chat/screens/chat_screen.dart';
 
 class NotificationScreen extends StatelessWidget {
   const NotificationScreen({super.key});
@@ -117,10 +118,46 @@ class NotificationScreen extends StatelessWidget {
                       ],
                     ],
                   ),
-                  onTap: () {
+                  onTap: () async {
                     _markAsRead(user.uid, doc.id);
-                    // Optional: Navigate to request details if requestId is present
-                    // if (data['requestId'] != null) { ... }
+
+                    // Navigate based on notification type
+                    final type = data['type'];
+                    if (type == 'chat') {
+                      // Navigate to chat screen
+                      final requestId = data['requestId'];
+                      final senderId = data['senderId'];
+
+                      if (requestId != null && senderId != null) {
+                        try {
+                          // Get sender details
+                          final senderDoc = await FirebaseFirestore.instance
+                              .collection('users')
+                              .doc(senderId)
+                              .get();
+
+                          final senderName =
+                              senderDoc.data()?['name'] ?? 'User';
+
+                          if (context.mounted) {
+                            Navigator.of(context).push(
+                              MaterialPageRoute(
+                                builder: (_) => ChatScreen(
+                                  requestId: requestId,
+                                  otherUserName: senderName,
+                                  otherUserId: senderId,
+                                ),
+                              ),
+                            );
+                          }
+                        } catch (e) {
+                          print('Error navigating to chat: $e');
+                        }
+                      }
+                    } else if (data['requestId'] != null) {
+                      // Navigate to request details
+                      // You can implement this later
+                    }
                   },
                 ),
               );

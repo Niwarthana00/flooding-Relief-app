@@ -90,3 +90,83 @@ exports.sendRequestStatusNotification = functions.firestore
             console.error("Error sending/saving notification:", error);
         }
     });
+
+exports.sendChatNotification = functions.firestore
+    .document("requests/{requestId}/messages/{messageId}")
+    .onCreate(async (snapshot, context) => {
+        const messageData = snapshot.data();
+        const receiverId = messageData.receiverId;
+        const senderId = messageData.senderId;
+        const messageText = messageData.text;
+
+        if (!receiverId || !senderId) {
+            console.log("Missing receiverId or senderId");
+            return null;
+        }
+
+        try {
+            // Get receiver's FCM token
+            const tokenDoc = await admin.firestore()
+                .collection("users_tokens")
+                .doc(receiverId)
+                .get();
+
+            if (!tokenDoc.exists) {
+                console.log("No token document found for user", receiverId);
+                return null;
+            }
+
+            const fcmToken = tokenDoc.data().fcmToken;
+
+            if (!fcmToken) {
+                console.log("No FCM token for user", receiverId);
+                return null;
+            }
+
+            // Get sender's name
+            const senderDoc = await admin.firestore()
+                .collection("users")
+                .doc(senderId)
+                .get();
+
+            const senderName = senderDoc.exists ? (senderDoc.data().name || "Someone") : "Someone";
+
+            const payload = {
+                notification: {
+                    title: `New message from ${senderName}`,
+                    body: messageText,
+                },
+                token: fcmToken,
+                data: {
+                    type: "chat",
+                    requestId: context.params.requestId,
+                    senderId: senderId,
+                    click_action: "FLUTTER_NOTIFICATION_CLICK",
+                },
+            };
+
+            // Send FCM notification
+            await admin.messaging().send(payload);
+            console.log("Chat notification sent successfully");
+
+            // Save to in-app notifications
+            await admin.firestore()
+                .collection("users")
+                .doc(receiverId)
+                .collection("notifications")
+                .add({
+                    title: `New message from ${senderName}`,
+                    body: messageText,
+                    type: "chat",
+                    requestId: context.params.requestId,
+                    senderId: senderId,
+                    isRead: false,
+                    createdAt: admin.firestore.FieldValue.serverTimestamp(),
+                });
+            console.log("Chat notification saved to Firestore");
+
+
+        } catch (error) {
+            console.error("Error sending chat notification:", error);
+        }
+    });

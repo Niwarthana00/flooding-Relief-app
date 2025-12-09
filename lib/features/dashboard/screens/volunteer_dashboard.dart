@@ -528,13 +528,13 @@ class _VolunteerDashboardState extends State<VolunteerDashboard> {
                     vertical: 6,
                   ),
                   decoration: BoxDecoration(
-                    color: const Color(0xFF10B981).withOpacity(0.1),
+                    color: AppColors.primaryBlue.withOpacity(0.1),
                     borderRadius: BorderRadius.circular(20),
                   ),
                   child: const Text(
                     'In Progress',
                     style: TextStyle(
-                      color: Color(0xFF10B981),
+                      color: AppColors.primaryBlue,
                       fontSize: 12,
                       fontWeight: FontWeight.bold,
                     ),
@@ -959,7 +959,7 @@ class _VolunteerDashboardState extends State<VolunteerDashboard> {
             color: AppColors.background,
             borderRadius: BorderRadius.circular(8),
           ),
-          child: Icon(icon, color: AppColors.primaryGreen),
+          child: Icon(icon, color: AppColors.primaryBlue),
         ),
         title: Text(
           title,
@@ -1024,7 +1024,7 @@ class _VolunteerDashboardState extends State<VolunteerDashboard> {
       ),
       title: Text(name),
       trailing: isSelected
-          ? const Icon(Icons.check_circle, color: AppColors.primaryGreen)
+          ? const Icon(Icons.check_circle, color: AppColors.primaryBlue)
           : null,
       onTap: () {
         provider.setLocale(Locale(code));
@@ -1287,7 +1287,7 @@ class _ActiveRequestCard extends StatelessWidget {
                         .update({'status': 'completed'});
                   },
                   style: ElevatedButton.styleFrom(
-                    backgroundColor: const Color(0xFF10B981),
+                    backgroundColor: AppColors.primaryBlue,
                     foregroundColor: Colors.white,
                     padding: const EdgeInsets.symmetric(vertical: 12),
                     shape: RoundedRectangleBorder(
@@ -1378,12 +1378,12 @@ class _AvailableRequestCard extends StatelessWidget {
                       Container(
                         padding: const EdgeInsets.all(10),
                         decoration: BoxDecoration(
-                          color: const Color(0xFFF0FDF4),
+                          color: const Color(0xFFEFF6FF),
                           borderRadius: BorderRadius.circular(10),
                         ),
                         child: const Icon(
                           Icons.inventory_2_outlined,
-                          color: Color(0xFF10B981),
+                          color: AppColors.primaryBlue,
                           size: 20,
                         ),
                       ),
@@ -1508,7 +1508,7 @@ class _AvailableRequestCard extends StatelessWidget {
   Color _getStatusColor(String? status) {
     switch (status?.toLowerCase()) {
       case 'completed':
-        return const Color(0xFFF0FDF4); // Green background
+        return const Color(0xFFEFF6FF); // Blue background
       case 'assigned':
       case 'arriving':
         return const Color(0xFFEFF6FF); // Blue background
@@ -1520,7 +1520,7 @@ class _AvailableRequestCard extends StatelessWidget {
   Color _getStatusTextColor(String? status) {
     switch (status?.toLowerCase()) {
       case 'completed':
-        return const Color(0xFF10B981); // Green text
+        return AppColors.primaryBlue; // Blue text
       case 'assigned':
       case 'arriving':
         return AppColors.primaryBlue; // Blue text

@@ -3,6 +3,7 @@ import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
+import 'package:sahana/features/chat/screens/chat_screen.dart';
 
 class NotificationService {
   static final NotificationService _instance = NotificationService._internal();
@@ -12,6 +13,12 @@ class NotificationService {
   final FirebaseMessaging _firebaseMessaging = FirebaseMessaging.instance;
   final FlutterLocalNotificationsPlugin _flutterLocalNotificationsPlugin =
       FlutterLocalNotificationsPlugin();
+
+  static BuildContext? _context;
+
+  static void setContext(BuildContext context) {
+    _context = context;
+  }
 
   Future<void> initialize() async {
     // Request permission
@@ -33,18 +40,97 @@ class NotificationService {
     const InitializationSettings initializationSettings =
         InitializationSettings(android: initializationSettingsAndroid);
 
-    await _flutterLocalNotificationsPlugin.initialize(initializationSettings);
+    await _flutterLocalNotificationsPlugin.initialize(
+      initializationSettings,
+      onDidReceiveNotificationResponse: _onNotificationTapped,
+    );
 
     // Handle Foreground Messages
     FirebaseMessaging.onMessage.listen((RemoteMessage message) {
       _showForegroundNotification(message);
     });
 
+    // Handle notification taps when app is in background
+    FirebaseMessaging.onMessageOpenedApp.listen(_handleNotificationTap);
+
+    // Check if app was opened from a notification
+    RemoteMessage? initialMessage = await _firebaseMessaging
+        .getInitialMessage();
+    if (initialMessage != null) {
+      _handleNotificationTap(initialMessage);
+    }
+
     // Save Token
     await _saveTokenToDatabase();
 
     // Listen for token refresh
     _firebaseMessaging.onTokenRefresh.listen(_saveTokenToDatabase);
+  }
+
+  void _onNotificationTapped(NotificationResponse response) {
+    // Handle local notification tap
+    print('Notification tapped: ${response.payload}');
+  }
+
+  void _handleNotificationTap(RemoteMessage message) {
+    final data = message.data;
+    final type = data['type'];
+
+    if (_context == null) {
+      print('Context not set, cannot navigate');
+      return;
+    }
+
+    if (type == 'chat') {
+      // Navigate to chat screen
+      final requestId = data['requestId'];
+      final senderId = data['senderId'];
+
+      if (requestId != null && senderId != null) {
+        _navigateToChat(_context!, requestId, senderId);
+      }
+    } else if (data['requestId'] != null) {
+      // Navigate to request detail screen
+      _navigateToRequestDetail(_context!, data['requestId']);
+    }
+  }
+
+  Future<void> _navigateToChat(
+    BuildContext context,
+    String requestId,
+    String senderId,
+  ) async {
+    try {
+      // Get sender details
+      final senderDoc = await FirebaseFirestore.instance
+          .collection('users')
+          .doc(senderId)
+          .get();
+
+      final senderName = senderDoc.data()?['name'] ?? 'User';
+
+      if (context.mounted) {
+        Navigator.of(context).push(
+          MaterialPageRoute(
+            builder: (_) => ChatScreen(
+              requestId: requestId,
+              otherUserName: senderName,
+              otherUserId: senderId,
+            ),
+          ),
+        );
+      }
+    } catch (e) {
+      print('Error navigating to chat: $e');
+    }
+  }
+
+  Future<void> _navigateToRequestDetail(
+    BuildContext context,
+    String requestId,
+  ) async {
+    // You can implement this similar to chat navigation
+    print('Navigate to request detail: $requestId');
   }
 
   Future<void> _saveTokenToDatabase([String? token]) async {
@@ -88,6 +174,7 @@ class NotificationService {
             icon: '@mipmap/ic_launcher',
           ),
         ),
+        payload: message.data.toString(),
       );
     }
   }

@@ -7,6 +7,8 @@ import 'package:sahana/l10n/app_localizations.dart';
 import 'package:sahana/core/providers/locale_provider.dart';
 import 'package:sahana/core/services/notification_service.dart';
 
+final GlobalKey<NavigatorState> navigatorKey = GlobalKey<NavigatorState>();
+
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await Firebase.initializeApp();
@@ -27,6 +29,7 @@ class MyApp extends StatelessWidget {
     return Consumer<LocaleProvider>(
       builder: (context, localeProvider, child) {
         return MaterialApp(
+          navigatorKey: navigatorKey,
           onGenerateTitle: (context) => AppLocalizations.of(context)!.appTitle,
           debugShowCheckedModeBanner: false,
           theme: ThemeData(
@@ -39,7 +42,15 @@ class MyApp extends StatelessWidget {
           locale: localeProvider.locale,
           localizationsDelegates: AppLocalizations.localizationsDelegates,
           supportedLocales: AppLocalizations.supportedLocales,
-          home: const AuthWrapper(),
+          home: Builder(
+            builder: (context) {
+              // Set context for notification service
+              WidgetsBinding.instance.addPostFrameCallback((_) {
+                NotificationService.setContext(context);
+              });
+              return const AuthWrapper();
+            },
+          ),
         );
       },
     );
