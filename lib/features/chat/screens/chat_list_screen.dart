@@ -11,6 +11,12 @@ class ChatListScreen extends StatelessWidget {
   Widget build(BuildContext context) {
     final user = FirebaseAuth.instance.currentUser;
 
+    if (user == null) {
+      return const Scaffold(
+        body: Center(child: Text('Please login to view messages')),
+      );
+    }
+
     return Scaffold(
       backgroundColor: AppColors.background,
       appBar: AppBar(
@@ -25,7 +31,7 @@ class ChatListScreen extends StatelessWidget {
       body: StreamBuilder<QuerySnapshot>(
         stream: FirebaseFirestore.instance
             .collection('chats')
-            .where('participants', arrayContains: user?.uid)
+            .where('participants', arrayContains: user.uid)
             .orderBy('updatedAt', descending: true)
             .snapshots(),
         builder: (context, snapshot) {
@@ -66,25 +72,30 @@ class ChatListScreen extends StatelessWidget {
               final doc = docs[index];
               final data = doc.data() as Map<String, dynamic>;
 
-              // Determine other user
-              final participants = List<String>.from(
+              final participants = List<dynamic>.from(
                 data['participants'] ?? [],
               );
               final otherUserId = participants.firstWhere(
-                (id) => id != user?.uid,
+                (id) => id != user.uid,
                 orElse: () => '',
               );
 
-              final userNames = data['userNames'] as Map<String, dynamic>?;
-              final otherUserName = userNames?[otherUserId] ?? 'User';
+              final participantDetails =
+                  data['participantDetails'] as Map<String, dynamic>?;
+              final otherUserName =
+                  participantDetails?[otherUserId]?['name'] ?? 'User';
+
+              final unreadCounts =
+                  data['unreadCounts'] as Map<String, dynamic>?;
+              final unreadCount = unreadCounts?[user.uid] ?? 0;
 
               return _ChatListItem(
-                requestId:
-                    '', // Not needed anymore for chat, but keeping for compatibility if needed
+                chatId: doc.id,
                 otherUserName: otherUserName,
                 otherUserId: otherUserId,
                 lastMessage: data['lastMessage'] ?? 'Tap to view conversation',
                 timestamp: data['updatedAt'] as Timestamp?,
+                unreadCount: unreadCount,
               );
             },
           );
@@ -95,18 +106,20 @@ class ChatListScreen extends StatelessWidget {
 }
 
 class _ChatListItem extends StatelessWidget {
-  final String requestId;
+  final String chatId;
   final String otherUserName;
   final String otherUserId;
   final String lastMessage;
   final Timestamp? timestamp;
+  final int unreadCount;
 
   const _ChatListItem({
-    required this.requestId,
+    required this.chatId,
     required this.otherUserName,
     required this.otherUserId,
     required this.lastMessage,
     this.timestamp,
+    this.unreadCount = 0,
   });
 
   @override
@@ -125,7 +138,6 @@ class _ChatListItem extends StatelessWidget {
             context,
             MaterialPageRoute(
               builder: (context) => ChatScreen(
-                requestId: requestId, // Passed but ignored by new logic
                 otherUserName: otherUserName,
                 otherUserId: otherUserId,
               ),
@@ -166,12 +178,20 @@ class _ChatListItem extends StatelessWidget {
                             color: AppColors.textDark,
                           ),
                         ),
-                        if (timestamp != null)
-                          Text(
-                            _formatTime(timestamp!),
-                            style: TextStyle(
-                              color: Colors.grey[500],
-                              fontSize: 12,
+                        if (unreadCount > 0)
+                          Container(
+                            padding: const EdgeInsets.all(6),
+                            decoration: const BoxDecoration(
+                              color: Colors.red,
+                              shape: BoxShape.circle,
+                            ),
+                            child: Text(
+                              unreadCount.toString(),
+                              style: const TextStyle(
+                                color: Colors.white,
+                                fontSize: 10,
+                                fontWeight: FontWeight.bold,
+                              ),
                             ),
                           ),
                       ],
@@ -179,34 +199,27 @@ class _ChatListItem extends StatelessWidget {
                     const SizedBox(height: 4),
                     Text(
                       lastMessage,
-                      style: TextStyle(color: Colors.grey[600], fontSize: 14),
+                      style: TextStyle(
+                        color: unreadCount > 0
+                            ? Colors.black87
+                            : Colors.grey[600],
+                        fontSize: 14,
+                        fontWeight: unreadCount > 0
+                            ? FontWeight.bold
+                            : FontWeight.normal,
+                      ),
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
                     ),
                   ],
                 ),
               ),
-              const Icon(Icons.chevron_right, color: Colors.grey),
+              if (unreadCount == 0)
+                const Icon(Icons.chevron_right, color: Colors.grey),
             ],
           ),
         ),
       ),
     );
-  }
-
-  String _formatTime(Timestamp timestamp) {
-    final now = DateTime.now();
-    final date = timestamp.toDate();
-    final diff = now.difference(date);
-
-    if (diff.inDays > 0) {
-      return '${diff.inDays}d ago';
-    } else if (diff.inHours > 0) {
-      return '${diff.inHours}h ago';
-    } else if (diff.inMinutes > 0) {
-      return '${diff.inMinutes}m ago';
-    } else {
-      return 'Just now';
-    }
   }
 }

@@ -1168,186 +1168,200 @@ class _ActiveRequestCard extends StatelessWidget {
           1000; // in km
     }
 
-    return Container(
-      padding: const EdgeInsets.all(20),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(20),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.05),
-            blurRadius: 10,
-            offset: const Offset(0, 4),
+    return GestureDetector(
+      onTap: () {
+        Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (context) =>
+                RequestDetailScreen(requestData: data, requestId: requestId),
           ),
-        ],
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              Container(
-                padding: const EdgeInsets.all(12),
-                decoration: BoxDecoration(
-                  color: const Color(0xFFEFF6FF),
-                  borderRadius: BorderRadius.circular(12),
+        );
+      },
+      child: Container(
+        padding: const EdgeInsets.all(20),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(20),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withOpacity(0.05),
+              blurRadius: 10,
+              offset: const Offset(0, 4),
+            ),
+          ],
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFEFF6FF),
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: const Icon(
+                    Icons.inventory_2_outlined,
+                    color: AppColors.primaryBlue,
+                  ),
                 ),
-                child: const Icon(
-                  Icons.inventory_2_outlined,
-                  color: AppColors.primaryBlue,
-                ),
-              ),
-              const SizedBox(width: 16),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      data['category'] ?? 'Request',
-                      style: const TextStyle(
-                        fontSize: 16,
-                        fontWeight: FontWeight.bold,
-                        color: AppColors.textDark,
+                const SizedBox(width: 16),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        data['category'] ?? 'Request',
+                        style: const TextStyle(
+                          fontSize: 16,
+                          fontWeight: FontWeight.bold,
+                          color: AppColors.textDark,
+                        ),
                       ),
-                    ),
-                    Text(
-                      '${data['urgency'] ?? 'Medium'} Priority',
-                      style: TextStyle(
-                        fontSize: 12,
-                        color: _getUrgencyColor(data['urgency']),
-                        fontWeight: FontWeight.w500,
+                      Text(
+                        '${data['urgency'] ?? 'Medium'} Priority',
+                        style: TextStyle(
+                          fontSize: 12,
+                          color: _getUrgencyColor(data['urgency']),
+                          fontWeight: FontWeight.w500,
+                        ),
                       ),
-                    ),
-                  ],
+                    ],
+                  ),
                 ),
-              ),
-              Container(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 10,
-                  vertical: 4,
-                ),
-                decoration: BoxDecoration(
-                  color: const Color(0xFFDBEAFE),
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                child: Row(
-                  children: [
-                    Container(
-                      width: 6,
-                      height: 6,
-                      decoration: const BoxDecoration(
-                        color: AppColors.primaryBlue,
-                        shape: BoxShape.circle,
+                const SizedBox(width: 8),
+                Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 10,
+                    vertical: 4,
+                  ),
+                  decoration: BoxDecoration(
+                    color: _getStatusColor(data['status']),
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: Row(
+                    children: [
+                      Container(
+                        width: 6,
+                        height: 6,
+                        decoration: BoxDecoration(
+                          color: _getStatusTextColor(data['status']),
+                          shape: BoxShape.circle,
+                        ),
                       ),
-                    ),
-                    const SizedBox(width: 6),
-                    Text(
-                      data['status'] ?? 'Assigned',
-                      style: const TextStyle(
-                        color: AppColors.primaryBlue,
-                        fontSize: 12,
-                        fontWeight: FontWeight.bold,
+                      const SizedBox(width: 6),
+                      Text(
+                        (data['status'] ?? 'Assigned').toString().toUpperCase(),
+                        style: TextStyle(
+                          color: _getStatusTextColor(data['status']),
+                          fontSize: 12,
+                          fontWeight: FontWeight.bold,
+                        ),
                       ),
-                    ),
-                  ],
+                    ],
+                  ),
                 ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 16),
-          Text(
-            data['description'] ?? '',
-            style: const TextStyle(color: AppColors.textLight, height: 1.5),
-            maxLines: 2,
-            overflow: TextOverflow.ellipsis,
-          ),
-          const SizedBox(height: 16),
-          Row(
-            children: [
-              const Icon(
-                Icons.location_on_outlined,
-                size: 16,
-                color: Colors.grey,
-              ),
-              const SizedBox(width: 4),
-              Expanded(
-                child: Text(
-                  data['address'] ?? 'Location',
-                  style: const TextStyle(color: Colors.grey, fontSize: 12),
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                ),
-              ),
-              if (distance > 0) ...[
-                const SizedBox(width: 12),
+              ],
+            ),
+            const SizedBox(height: 16),
+            Text(
+              data['description'] ?? '',
+              style: const TextStyle(color: AppColors.textLight, height: 1.5),
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
+            ),
+            const SizedBox(height: 16),
+            Row(
+              children: [
                 const Icon(
-                  Icons.directions_car_outlined,
+                  Icons.location_on_outlined,
                   size: 16,
                   color: Colors.grey,
                 ),
                 const SizedBox(width: 4),
-                Text(
-                  '${distance.toStringAsFixed(1)} km',
-                  style: const TextStyle(
-                    color: AppColors.primaryBlue,
-                    fontSize: 12,
-                    fontWeight: FontWeight.bold,
+                Expanded(
+                  child: Text(
+                    data['address'] ?? 'Location',
+                    style: const TextStyle(color: Colors.grey, fontSize: 12),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ),
+                if (distance > 0) ...[
+                  const SizedBox(width: 12),
+                  const Icon(
+                    Icons.directions_car_outlined,
+                    size: 16,
+                    color: Colors.grey,
+                  ),
+                  const SizedBox(width: 4),
+                  Text(
+                    '${distance.toStringAsFixed(1)} km',
+                    style: const TextStyle(
+                      color: AppColors.primaryBlue,
+                      fontSize: 12,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                ],
+              ],
+            ),
+            const SizedBox(height: 20),
+            // Chat and Call Icons moved to bottom
+            Row(
+              children: [
+                Expanded(
+                  child: ElevatedButton.icon(
+                    onPressed: () async {
+                      if (location != null) {
+                        final url = Uri.parse(
+                          'https://www.google.com/maps/search/?api=1&query=${location.latitude},${location.longitude}',
+                        );
+                        if (await canLaunchUrl(url)) {
+                          await launchUrl(url);
+                        }
+                      }
+                    },
+                    icon: const Icon(Icons.navigation, size: 18),
+                    label: const Text('Navigate'),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: AppColors.primaryBlue,
+                      foregroundColor: Colors.white,
+                      padding: const EdgeInsets.symmetric(vertical: 12),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: ElevatedButton(
+                    onPressed: () async {
+                      // Mark as completed
+                      await FirebaseFirestore.instance
+                          .collection('requests')
+                          .doc(requestId)
+                          .update({'status': 'completed'});
+                    },
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor:
+                          Colors.green, // Changed to green for completion
+                      foregroundColor: Colors.white,
+                      padding: const EdgeInsets.symmetric(vertical: 12),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                    ),
+                    child: const Text('Complete'),
                   ),
                 ),
               ],
-            ],
-          ),
-          const SizedBox(height: 20),
-          Row(
-            children: [
-              Expanded(
-                child: ElevatedButton.icon(
-                  onPressed: () async {
-                    if (location != null) {
-                      final url = Uri.parse(
-                        'https://www.google.com/maps/search/?api=1&query=${location.latitude},${location.longitude}',
-                      );
-                      if (await canLaunchUrl(url)) {
-                        await launchUrl(url);
-                      }
-                    }
-                  },
-                  icon: const Icon(Icons.navigation, size: 18),
-                  label: const Text('Navigate'),
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: AppColors.primaryBlue,
-                    foregroundColor: Colors.white,
-                    padding: const EdgeInsets.symmetric(vertical: 12),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                  ),
-                ),
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: ElevatedButton(
-                  onPressed: () async {
-                    // Mark as completed
-                    await FirebaseFirestore.instance
-                        .collection('requests')
-                        .doc(requestId)
-                        .update({'status': 'completed'});
-                  },
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: AppColors.primaryBlue,
-                    foregroundColor: Colors.white,
-                    padding: const EdgeInsets.symmetric(vertical: 12),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                  ),
-                  child: const Text('Complete'),
-                ),
-              ),
-            ],
-          ),
-        ],
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -1360,6 +1374,30 @@ class _ActiveRequestCard extends StatelessWidget {
         return Colors.orange;
       default:
         return Colors.blue;
+    }
+  }
+
+  Color _getStatusColor(String? status) {
+    switch (status?.toLowerCase()) {
+      case 'completed':
+        return const Color(0xFFEFF6FF); // Blue background
+      case 'assigned':
+      case 'arriving':
+        return const Color(0xFFEFF6FF); // Blue background
+      default:
+        return const Color(0xFFFEF3C7); // Orange/Yellow background
+    }
+  }
+
+  Color _getStatusTextColor(String? status) {
+    switch (status?.toLowerCase()) {
+      case 'completed':
+        return AppColors.primaryBlue; // Blue text
+      case 'assigned':
+      case 'arriving':
+        return AppColors.primaryBlue; // Blue text
+      default:
+        return const Color(0xFFD97706); // Orange/Yellow text
     }
   }
 }

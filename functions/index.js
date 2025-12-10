@@ -92,12 +92,13 @@ exports.sendRequestStatusNotification = functions.firestore
     });
 
 exports.sendChatNotification = functions.firestore
-    .document("requests/{requestId}/messages/{messageId}")
+    .document("chats/{chatId}/messages/{messageId}")
     .onCreate(async (snapshot, context) => {
         const messageData = snapshot.data();
         const receiverId = messageData.receiverId;
         const senderId = messageData.senderId;
         const messageText = messageData.text;
+        const requestId = messageData.requestId; // Optional now
 
         if (!receiverId || !senderId) {
             console.log("Missing receiverId or senderId");
@@ -139,11 +140,15 @@ exports.sendChatNotification = functions.firestore
                 token: fcmToken,
                 data: {
                     type: "chat",
-                    requestId: context.params.requestId,
+                    chatId: context.params.chatId,
                     senderId: senderId,
                     click_action: "FLUTTER_NOTIFICATION_CLICK",
                 },
             };
+
+            if (requestId) {
+                payload.data.requestId = requestId;
+            }
 
             // Send FCM notification
             await admin.messaging().send(payload);
@@ -174,15 +179,21 @@ exports.sendChatNotification = functions.firestore
                 console.log("Updated existing chat notification");
             } else {
                 // Create new notification
-                await notificationsRef.add({
+                const notificationData = {
                     title: `New message from ${senderName}`,
                     body: "You have a new message.",
                     type: "chat",
-                    requestId: context.params.requestId,
+                    chatId: context.params.chatId,
                     senderId: senderId,
                     isRead: false,
                     createdAt: admin.firestore.FieldValue.serverTimestamp(),
-                });
+                };
+
+                if (requestId) {
+                    notificationData.requestId = requestId;
+                }
+
+                await notificationsRef.add(notificationData);
                 console.log("Created new chat notification");
             }
             console.log("Chat notification saved to Firestore");

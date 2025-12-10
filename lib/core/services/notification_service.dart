@@ -86,7 +86,7 @@ class NotificationService {
       final requestId = data['requestId'];
       final senderId = data['senderId'];
 
-      if (requestId != null && senderId != null) {
+      if (senderId != null) {
         _navigateToChat(_context!, requestId, senderId);
       }
     } else if (data['requestId'] != null) {
@@ -97,7 +97,7 @@ class NotificationService {
 
   Future<void> _navigateToChat(
     BuildContext context,
-    String requestId,
+    String? requestId,
     String senderId,
   ) async {
     try {

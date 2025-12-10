@@ -5,13 +5,13 @@ import 'package:sahana/core/theme/app_colors.dart';
 import 'package:intl/intl.dart';
 
 class ChatScreen extends StatefulWidget {
-  final String requestId;
+  final String? requestId;
   final String otherUserName;
   final String otherUserId;
 
   const ChatScreen({
     super.key,
-    required this.requestId,
+    this.requestId,
     required this.otherUserName,
     required this.otherUserId,
   });
@@ -24,19 +24,41 @@ class _ChatScreenState extends State<ChatScreen> {
   final TextEditingController _messageController = TextEditingController();
   final ScrollController _scrollController = ScrollController();
   final currentUser = FirebaseAuth.instance.currentUser;
-  late String chatId;
+
+  String get chatId {
+    final uid1 = currentUser?.uid ?? '';
+    final uid2 = widget.otherUserId;
+    return uid1.compareTo(uid2) < 0 ? '${uid1}_$uid2' : '${uid2}_$uid1';
+  }
+
+  String _currentUserName = 'User';
 
   @override
   void initState() {
     super.initState();
-    _initializeChatId();
+    _fetchCurrentUserName();
     _markAsRead();
   }
 
-  void _initializeChatId() {
-    final ids = [currentUser!.uid, widget.otherUserId];
-    ids.sort();
-    chatId = ids.join('_');
+  Future<void> _fetchCurrentUserName() async {
+    final user = FirebaseAuth.instance.currentUser;
+    if (user?.displayName != null && user!.displayName!.isNotEmpty) {
+      _currentUserName = user.displayName!;
+    } else if (user != null) {
+      try {
+        final doc = await FirebaseFirestore.instance
+            .collection('users')
+            .doc(user.uid)
+            .get();
+        if (doc.exists && mounted) {
+          setState(() {
+            _currentUserName = doc.data()?['name'] ?? 'User';
+          });
+        }
+      } catch (e) {
+        debugPrint('Error fetching user name: $e');
+      }
+    }
   }
 
   @override
@@ -53,23 +75,22 @@ class _ChatScreenState extends State<ChatScreen> {
     try {
       final batch = FirebaseFirestore.instance.batch();
 
-      // 1. Mark notifications as read
-      // Note: Notifications might still be linked to requestId or just general.
-      // We will keep this as is for now, or update if notifications change structure.
-      // Assuming notifications are still per user.
-      final notificationsQuery = await FirebaseFirestore.instance
-          .collection('users')
-          .doc(userId)
-          .collection('notifications')
-          .where('senderId', isEqualTo: widget.otherUserId)
-          .where('isRead', isEqualTo: false)
-          .get();
+      // 1. Mark notifications as read (if requestId is provided)
+      if (widget.requestId != null) {
+        final notificationsQuery = await FirebaseFirestore.instance
+            .collection('users')
+            .doc(userId)
+            .collection('notifications')
+            .where('requestId', isEqualTo: widget.requestId)
+            .where('isRead', isEqualTo: false)
+            .get();
 
-      for (var doc in notificationsQuery.docs) {
-        batch.update(doc.reference, {'isRead': true});
+        for (var doc in notificationsQuery.docs) {
+          batch.update(doc.reference, {'isRead': true});
+        }
       }
 
-      // 2. Mark messages as read in the new collection
+      // 2. Mark messages as read in the chat
       final messagesQuery = await FirebaseFirestore.instance
           .collection('chats')
           .doc(chatId)
@@ -80,6 +101,15 @@ class _ChatScreenState extends State<ChatScreen> {
 
       for (var doc in messagesQuery.docs) {
         batch.update(doc.reference, {'isRead': true});
+      }
+
+      // 3. Reset unread count for this user in the chat document
+      final chatRef = FirebaseFirestore.instance
+          .collection('chats')
+          .doc(chatId);
+      final chatDoc = await chatRef.get();
+      if (chatDoc.exists) {
+        batch.update(chatRef, {'unreadCounts.$userId': 0});
       }
 
       await batch.commit();
@@ -95,37 +125,43 @@ class _ChatScreenState extends State<ChatScreen> {
     _messageController.clear();
 
     try {
-      final batch = FirebaseFirestore.instance.batch();
-      final chatDocRef = FirebaseFirestore.instance
+      final chatRef = FirebaseFirestore.instance
           .collection('chats')
           .doc(chatId);
-      final messageDocRef = chatDocRef.collection('messages').doc();
 
       // Add message
-      batch.set(messageDocRef, {
+      await chatRef.collection('messages').add({
         'text': message,
         'senderId': currentUser?.uid,
         'receiverId': widget.otherUserId,
         'createdAt': FieldValue.serverTimestamp(),
         'isRead': false,
+        'requestId': widget.requestId, // Optional: link to request context
       });
 
-      // Update chat metadata
-      batch.set(chatDocRef, {
-        'participants': [currentUser?.uid, widget.otherUserId],
-        'lastMessage': message,
-        'lastMessageTime': FieldValue.serverTimestamp(),
-        'updatedAt': FieldValue.serverTimestamp(),
-        // We might want to store user names here for easier listing,
-        // but for now we can fetch them or rely on what we have.
-        // Let's store them to make ChatListScreen easier.
-        'userNames': {
-          currentUser?.uid: currentUser?.displayName ?? 'User',
-          widget.otherUserId: widget.otherUserName,
-        },
-      }, SetOptions(merge: true));
-
-      await batch.commit();
+      // Update chat metadata and unread count
+      final chatDoc = await chatRef.get();
+      if (chatDoc.exists) {
+        await chatRef.update({
+          'lastMessage': message,
+          'lastMessageTime': FieldValue.serverTimestamp(),
+          'updatedAt': FieldValue.serverTimestamp(),
+          'participantDetails.${currentUser?.uid}.name': _currentUserName,
+          'unreadCounts.${widget.otherUserId}': FieldValue.increment(1),
+        });
+      } else {
+        await chatRef.set({
+          'participants': [currentUser?.uid, widget.otherUserId],
+          'lastMessage': message,
+          'lastMessageTime': FieldValue.serverTimestamp(),
+          'updatedAt': FieldValue.serverTimestamp(),
+          'participantDetails': {
+            currentUser?.uid: {'name': _currentUserName},
+            widget.otherUserId: {'name': widget.otherUserName},
+          },
+          'unreadCounts': {currentUser?.uid: 0, widget.otherUserId: 1},
+        });
+      }
 
       // Scroll to bottom
       if (_scrollController.hasClients) {
