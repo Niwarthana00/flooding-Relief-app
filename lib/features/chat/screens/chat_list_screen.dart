@@ -22,112 +22,69 @@ class ChatListScreen extends StatelessWidget {
         elevation: 0,
         foregroundColor: AppColors.textDark,
       ),
-      body: StreamBuilder<DocumentSnapshot>(
-        // Query requests where user is participant
-        // Firestore doesn't support logical OR directly in queries easily for this structure without composite indexes or separate queries.
-        // However, we can stream all requests and filter client side if the dataset isn't huge,
-        // OR we can rely on a 'participants' array if we had one.
-        // Since we don't, and we have two roles, let's try to query based on the user's role or just fetch relevant ones.
-        // A better approach for scalability is to have a 'chats' collection, but sticking to existing structure:
-        // We'll try to fetch requests where userId == uid OR volunteerId == uid.
-        // Since we can't do OR, we might need two streams or just fetch one if we know the role.
-        // But the dashboard knows the role.
-        // Actually, let's just fetch ALL requests for now and filter? No, that's bad.
-        // Let's assume we can determine the role or just try both?
-        // Wait, the user is logged in. If they are a beneficiary, they are 'userId'. If volunteer, 'volunteerId'.
-        // But a user *could* theoretically be both in some apps, but here likely one.
-        // Let's check the user document to see the role, or just use the dashboard context.
-        // For simplicity, let's try to fetch where 'userId' == uid. If empty, try 'volunteerId' == uid?
-        // Or better, use a StreamGroup or MergeStream?
-        // Let's just use a simple approach: The user is likely EITHER beneficiary OR volunteer.
-        // We can check the user's role from Firestore first?
-        // Actually, let's just use the 'users' collection to get the role, then query accordingly.
+      body: StreamBuilder<QuerySnapshot>(
         stream: FirebaseFirestore.instance
-            .collection('users')
-            .doc(user?.uid)
+            .collection('chats')
+            .where('participants', arrayContains: user?.uid)
+            .orderBy('updatedAt', descending: true)
             .snapshots(),
-        builder: (context, userSnapshot) {
-          if (!userSnapshot.hasData) {
+        builder: (context, snapshot) {
+          if (snapshot.hasError) {
+            return Center(child: Text('Error: ${snapshot.error}'));
+          }
+
+          if (snapshot.connectionState == ConnectionState.waiting) {
             return const Center(child: CircularProgressIndicator());
           }
 
-          final userData = userSnapshot.data!.data() as Map<String, dynamic>?;
-          final role = userData?['role'];
+          final docs = snapshot.data?.docs ?? [];
 
-          Query query = FirebaseFirestore.instance.collection('requests');
-          if (role == 'volunteer') {
-            query = query.where('volunteerId', isEqualTo: user?.uid);
-          } else {
-            query = query.where('userId', isEqualTo: user?.uid);
+          if (docs.isEmpty) {
+            return Center(
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Icon(
+                    Icons.chat_bubble_outline,
+                    size: 64,
+                    color: Colors.grey[300],
+                  ),
+                  const SizedBox(height: 16),
+                  Text(
+                    'No messages yet',
+                    style: TextStyle(color: Colors.grey[500]),
+                  ),
+                ],
+              ),
+            );
           }
 
-          return StreamBuilder<QuerySnapshot>(
-            stream: query
-                .orderBy('createdAt', descending: true)
-                .snapshots(), // Using createdAt to ensure all requests show up
-            builder: (context, snapshot) {
-              if (snapshot.hasError) {
-                return Center(child: Text('Error: ${snapshot.error}'));
-              }
+          return ListView.builder(
+            padding: const EdgeInsets.all(16),
+            itemCount: docs.length,
+            itemBuilder: (context, index) {
+              final doc = docs[index];
+              final data = doc.data() as Map<String, dynamic>;
 
-              if (snapshot.connectionState == ConnectionState.waiting) {
-                return const Center(child: CircularProgressIndicator());
-              }
+              // Determine other user
+              final participants = List<String>.from(
+                data['participants'] ?? [],
+              );
+              final otherUserId = participants.firstWhere(
+                (id) => id != user?.uid,
+                orElse: () => '',
+              );
 
-              final docs = snapshot.data?.docs ?? [];
+              final userNames = data['userNames'] as Map<String, dynamic>?;
+              final otherUserName = userNames?[otherUserId] ?? 'User';
 
-              // Filter out requests that are not relevant (e.g. maybe completed ones should still be shown for history?)
-              // Let's show all assigned/active requests + completed ones.
-              final chatDocs = docs.where((doc) {
-                final data = doc.data() as Map<String, dynamic>;
-                // Show if there is a volunteer assigned (so a chat can exist)
-                return data['volunteerId'] != null;
-              }).toList();
-
-              if (chatDocs.isEmpty) {
-                return Center(
-                  child: Column(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      Icon(
-                        Icons.chat_bubble_outline,
-                        size: 64,
-                        color: Colors.grey[300],
-                      ),
-                      const SizedBox(height: 16),
-                      Text(
-                        'No messages yet',
-                        style: TextStyle(color: Colors.grey[500]),
-                      ),
-                    ],
-                  ),
-                );
-              }
-
-              return ListView.builder(
-                padding: const EdgeInsets.all(16),
-                itemCount: chatDocs.length,
-                itemBuilder: (context, index) {
-                  final doc = chatDocs[index];
-                  final data = doc.data() as Map<String, dynamic>;
-                  final otherUserName = role == 'volunteer'
-                      ? (data['userName'] ?? 'Beneficiary')
-                      : (data['volunteerName'] ?? 'Volunteer');
-                  final otherUserId = role == 'volunteer'
-                      ? data['userId']
-                      : data['volunteerId'];
-
-                  return _ChatListItem(
-                    requestId: doc.id,
-                    otherUserName: otherUserName,
-                    otherUserId: otherUserId,
-                    lastMessage:
-                        'Tap to view conversation', // We could fetch the last message if we had a subcollection summary
-                    timestamp:
-                        data['updatedAt'] as Timestamp? ??
-                        data['createdAt'] as Timestamp?,
-                  );
-                },
+              return _ChatListItem(
+                requestId:
+                    '', // Not needed anymore for chat, but keeping for compatibility if needed
+                otherUserName: otherUserName,
+                otherUserId: otherUserId,
+                lastMessage: data['lastMessage'] ?? 'Tap to view conversation',
+                timestamp: data['updatedAt'] as Timestamp?,
               );
             },
           );
@@ -168,7 +125,7 @@ class _ChatListItem extends StatelessWidget {
             context,
             MaterialPageRoute(
               builder: (context) => ChatScreen(
-                requestId: requestId,
+                requestId: requestId, // Passed but ignored by new logic
                 otherUserName: otherUserName,
                 otherUserId: otherUserId,
               ),
@@ -209,7 +166,14 @@ class _ChatListItem extends StatelessWidget {
                             color: AppColors.textDark,
                           ),
                         ),
-                        // We could add a time here if we had it
+                        if (timestamp != null)
+                          Text(
+                            _formatTime(timestamp!),
+                            style: TextStyle(
+                              color: Colors.grey[500],
+                              fontSize: 12,
+                            ),
+                          ),
                       ],
                     ),
                     const SizedBox(height: 4),
@@ -228,5 +192,21 @@ class _ChatListItem extends StatelessWidget {
         ),
       ),
     );
+  }
+
+  String _formatTime(Timestamp timestamp) {
+    final now = DateTime.now();
+    final date = timestamp.toDate();
+    final diff = now.difference(date);
+
+    if (diff.inDays > 0) {
+      return '${diff.inDays}d ago';
+    } else if (diff.inHours > 0) {
+      return '${diff.inHours}h ago';
+    } else if (diff.inMinutes > 0) {
+      return '${diff.inMinutes}m ago';
+    } else {
+      return 'Just now';
+    }
   }
 }

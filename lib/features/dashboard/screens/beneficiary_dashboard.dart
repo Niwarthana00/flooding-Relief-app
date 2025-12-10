@@ -320,11 +320,6 @@ class _HomeTabState extends State<_HomeTab> {
               ].contains(status);
             }).toList();
 
-            final pastRequests = docs.where((doc) {
-              final status = (doc['status'] as String).toLowerCase();
-              return ['completed', 'rejected', 'cancelled'].contains(status);
-            }).toList();
-
             return SingleChildScrollView(
               child: Column(
                 children: [
@@ -693,78 +688,7 @@ class _HomeTabState extends State<_HomeTab> {
                             );
                           }),
 
-                        const SizedBox(height: 32),
-
-                        // Past Requests Header
-                        Row(
-                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                          children: [
-                            const Text(
-                              'Past Requests',
-                              style: TextStyle(
-                                fontSize: 18,
-                                fontWeight: FontWeight.bold,
-                                color: AppColors.textDark,
-                              ),
-                            ),
-                            TextButton(
-                              onPressed: () {},
-                              child: const Text('View All'),
-                            ),
-                          ],
-                        ),
-                        const SizedBox(height: 16),
-
-                        // Past Request Cards
-                        if (pastRequests.isEmpty)
-                          const Center(
-                            child: Padding(
-                              padding: EdgeInsets.all(20.0),
-                              child: Text('No past requests'),
-                            ),
-                          )
-                        else
-                          ...pastRequests.map((doc) {
-                            final data = doc.data() as Map<String, dynamic>;
-                            return Padding(
-                              padding: const EdgeInsets.only(bottom: 16.0),
-                              child: _RequestCard(
-                                title: data['category'] ?? 'Request',
-                                status: data['status'] ?? 'Completed',
-                                statusColor: _getStatusColor(
-                                  data['status'] ?? 'Completed',
-                                ),
-                                statusTextColor: _getStatusTextColor(
-                                  data['status'] ?? 'Completed',
-                                ),
-                                priority:
-                                    '${data['urgency'] ?? 'Medium'} Priority',
-                                priorityColor: _getUrgencyColor(
-                                  data['urgency'] ?? 'Medium',
-                                ),
-                                description: data['description'] ?? '',
-                                location: data['address'] ?? 'Location',
-                                time: _getTimeAgo(
-                                  data['createdAt'] as Timestamp?,
-                                ),
-                                icon: _getCategoryIcon(
-                                  data['category']?.toString().toLowerCase(),
-                                ),
-                                isCompleted: true,
-                                onTap: () {
-                                  Navigator.push(
-                                    context,
-                                    MaterialPageRoute(
-                                      builder: (context) => RequestDetailScreen(
-                                        requestData: data,
-                                        requestId: doc.id,
-                                      ),
-                                    ),
-                                  );
-                                },
-                              ),
-                            );
-                          }),
+                        const SizedBox(height: 80), // Bottom padding
                         const SizedBox(height: 80), // Bottom padding
                       ],
                     ),
@@ -787,7 +711,14 @@ class _RequestsTab extends StatefulWidget {
 }
 
 class _RequestsTabState extends State<_RequestsTab> {
-  String _filter = 'All'; // All, Active, Past
+  String _filter = 'All';
+  final List<String> _filterOptions = [
+    'All',
+    'Pending',
+    'Active',
+    'Completed',
+    'Cancelled',
+  ];
 
   String _getTimeAgo(Timestamp? timestamp) {
     if (timestamp == null) return '';
@@ -895,139 +826,185 @@ class _RequestsTabState extends State<_RequestsTab> {
         backgroundColor: Colors.white,
         elevation: 0,
         automaticallyImplyLeading: false,
-        actions: [
-          PopupMenuButton<String>(
-            icon: const Icon(Icons.filter_list, color: AppColors.textDark),
-            onSelected: (value) {
-              setState(() {
-                _filter = value;
-              });
-            },
-            itemBuilder: (context) => [
-              const PopupMenuItem(value: 'All', child: Text('All Requests')),
-              const PopupMenuItem(value: 'Active', child: Text('Active Only')),
-              const PopupMenuItem(value: 'Past', child: Text('Past Only')),
-            ],
-          ),
-        ],
+        actions: [],
       ),
-      body: StreamBuilder<QuerySnapshot>(
-        stream: FirebaseFirestore.instance
-            .collection('requests')
-            .where('userId', isEqualTo: user?.uid)
-            .orderBy('createdAt', descending: true)
-            .snapshots(),
-        builder: (context, snapshot) {
-          if (snapshot.hasError) {
-            return Center(child: Text('Error: ${snapshot.error}'));
-          }
-
-          if (snapshot.connectionState == ConnectionState.waiting) {
-            return const Center(child: CircularProgressIndicator());
-          }
-
-          final docs = snapshot.data?.docs ?? [];
-
-          final filteredDocs = docs.where((doc) {
-            final status = (doc['status'] as String).toLowerCase();
-            final isActive = [
-              'pending',
-              'approved',
-              'assigned',
-              'arriving',
-            ].contains(status);
-
-            if (_filter == 'Active') return isActive;
-            if (_filter == 'Past') return !isActive;
-            return true;
-          }).toList();
-
-          if (filteredDocs.isEmpty) {
-            return Center(
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  const Icon(
-                    Icons.inbox_outlined,
-                    size: 64,
-                    color: Colors.grey,
-                  ),
-                  const SizedBox(height: 16),
-                  const Text(
-                    'No requests found',
-                    style: TextStyle(color: Colors.grey),
-                  ),
-                  const SizedBox(height: 24),
-                  ElevatedButton.icon(
-                    onPressed: () {
-                      Navigator.push(
-                        context,
-                        MaterialPageRoute(
-                          builder: (context) => const CreateRequestScreen(),
-                        ),
-                      );
+      body: Column(
+        children: [
+          // Filter Chips
+          Container(
+            height: 60,
+            padding: const EdgeInsets.symmetric(vertical: 8),
+            child: ListView.builder(
+              scrollDirection: Axis.horizontal,
+              padding: const EdgeInsets.symmetric(horizontal: 16),
+              itemCount: _filterOptions.length,
+              itemBuilder: (context, index) {
+                final filter = _filterOptions[index];
+                final isSelected = _filter == filter;
+                return Padding(
+                  padding: const EdgeInsets.only(right: 8),
+                  child: FilterChip(
+                    label: Text(filter),
+                    selected: isSelected,
+                    onSelected: (selected) {
+                      setState(() {
+                        _filter = filter;
+                      });
                     },
-                    icon: const Icon(Icons.add),
-                    label: const Text('Create Request'),
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: AppColors.primaryGreen,
-                      foregroundColor: Colors.white,
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(12),
+                    backgroundColor: Colors.white,
+                    selectedColor: AppColors.primaryGreen.withOpacity(0.2),
+                    labelStyle: TextStyle(
+                      color: isSelected
+                          ? AppColors.primaryGreen
+                          : AppColors.textDark,
+                      fontWeight: isSelected
+                          ? FontWeight.bold
+                          : FontWeight.normal,
+                    ),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(20),
+                      side: BorderSide(
+                        color: isSelected
+                            ? AppColors.primaryGreen
+                            : Colors.grey.shade300,
                       ),
                     ),
+                    showCheckmark: false,
                   ),
-                ],
-              ),
-            );
-          }
+                );
+              },
+            ),
+          ),
+          Expanded(
+            child: StreamBuilder<QuerySnapshot>(
+              stream: FirebaseFirestore.instance
+                  .collection('requests')
+                  .where('userId', isEqualTo: user?.uid)
+                  .orderBy('createdAt', descending: true)
+                  .snapshots(),
+              builder: (context, snapshot) {
+                if (snapshot.hasError) {
+                  return Center(child: Text('Error: ${snapshot.error}'));
+                }
 
-          return ListView.builder(
-            padding: const EdgeInsets.all(16),
-            itemCount: filteredDocs.length,
-            itemBuilder: (context, index) {
-              final doc = filteredDocs[index];
-              final data = doc.data() as Map<String, dynamic>;
-              final status = data['status'] ?? 'Pending';
-              final isCompleted = [
-                'completed',
-                'rejected',
-                'cancelled',
-              ].contains(status.toLowerCase());
+                if (snapshot.connectionState == ConnectionState.waiting) {
+                  return const Center(child: CircularProgressIndicator());
+                }
 
-              return Padding(
-                padding: const EdgeInsets.only(bottom: 16.0),
-                child: _RequestCard(
-                  title: data['category'] ?? 'Request',
-                  status: status,
-                  statusColor: _getStatusColor(status),
-                  statusTextColor: _getStatusTextColor(status),
-                  priority: '${data['urgency'] ?? 'Medium'} Priority',
-                  priorityColor: _getUrgencyColor(data['urgency'] ?? 'Medium'),
-                  description: data['description'] ?? '',
-                  location: data['address'] ?? 'Location',
-                  time: _getTimeAgo(data['createdAt'] as Timestamp?),
-                  volunteerName: data['volunteerName'],
-                  icon: _getCategoryIcon(
-                    data['category']?.toString().toLowerCase(),
-                  ),
-                  isCompleted: isCompleted,
-                  onTap: () {
-                    Navigator.push(
-                      context,
-                      MaterialPageRoute(
-                        builder: (context) => RequestDetailScreen(
-                          requestData: data,
-                          requestId: doc.id,
+                final docs = snapshot.data?.docs ?? [];
+
+                final filteredDocs = docs.where((doc) {
+                  final status = (doc['status'] as String).toLowerCase();
+
+                  if (_filter == 'All') return true;
+
+                  if (_filter == 'Active') {
+                    return [
+                      'approved',
+                      'assigned',
+                      'arriving',
+                    ].contains(status);
+                  }
+
+                  if (_filter == 'Cancelled') {
+                    return ['cancelled', 'rejected'].contains(status);
+                  }
+
+                  return status == _filter.toLowerCase();
+                }).toList();
+
+                if (filteredDocs.isEmpty) {
+                  return Center(
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        const Icon(
+                          Icons.inbox_outlined,
+                          size: 64,
+                          color: Colors.grey,
                         ),
+                        const SizedBox(height: 16),
+                        const Text(
+                          'No requests found',
+                          style: TextStyle(color: Colors.grey),
+                        ),
+                        const SizedBox(height: 24),
+                        ElevatedButton.icon(
+                          onPressed: () {
+                            Navigator.push(
+                              context,
+                              MaterialPageRoute(
+                                builder: (context) =>
+                                    const CreateRequestScreen(),
+                              ),
+                            );
+                          },
+                          icon: const Icon(Icons.add),
+                          label: const Text('Create Request'),
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: AppColors.primaryGreen,
+                            foregroundColor: Colors.white,
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  );
+                }
+
+                return ListView.builder(
+                  padding: const EdgeInsets.all(16),
+                  itemCount: filteredDocs.length,
+                  itemBuilder: (context, index) {
+                    final doc = filteredDocs[index];
+                    final data = doc.data() as Map<String, dynamic>;
+                    final status = data['status'] ?? 'Pending';
+                    final isCompleted = [
+                      'completed',
+                      'rejected',
+                      'cancelled',
+                    ].contains(status.toLowerCase());
+
+                    return Padding(
+                      padding: const EdgeInsets.only(bottom: 16.0),
+                      child: _RequestCard(
+                        title: data['category'] ?? 'Request',
+                        status: status,
+                        statusColor: _getStatusColor(status),
+                        statusTextColor: _getStatusTextColor(status),
+                        priority: '${data['urgency'] ?? 'Medium'} Priority',
+                        priorityColor: _getUrgencyColor(
+                          data['urgency'] ?? 'Medium',
+                        ),
+                        description: data['description'] ?? '',
+                        location: data['address'] ?? 'Location',
+                        time: _getTimeAgo(data['createdAt'] as Timestamp?),
+                        volunteerName: data['volunteerName'],
+                        icon: _getCategoryIcon(
+                          data['category']?.toString().toLowerCase(),
+                        ),
+                        isCompleted: isCompleted,
+                        onTap: () {
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (context) => RequestDetailScreen(
+                                requestData: data,
+                                requestId: doc.id,
+                              ),
+                            ),
+                          );
+                        },
                       ),
                     );
                   },
-                ),
-              );
-            },
-          );
-        },
+                );
+              },
+            ),
+          ),
+        ],
       ),
     );
   }

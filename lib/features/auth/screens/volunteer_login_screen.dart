@@ -35,10 +35,6 @@ class _VolunteerLoginScreenState extends State<VolunteerLoginScreen> {
               .get();
 
           if (mounted) {
-            ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(content: Text('Signed in successfully!')),
-            );
-
             if (userDoc.exists) {
               final userData = userDoc.data();
               final role = userData?['role'];
@@ -69,6 +65,9 @@ class _VolunteerLoginScreenState extends State<VolunteerLoginScreen> {
               await NotificationService().initialize();
 
               if (mounted) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(content: Text('Signed in successfully!')),
+                );
                 Navigator.pushReplacement(
                   context,
                   MaterialPageRoute(
@@ -120,18 +119,6 @@ class _VolunteerLoginScreenState extends State<VolunteerLoginScreen> {
         child: SafeArea(
           child: Stack(
             children: [
-              // Back Button
-              Positioned(
-                top: 16,
-                left: 16,
-                child: IconButton(
-                  onPressed: () => Navigator.pop(context),
-                  icon: const Icon(
-                    Icons.arrow_back_ios_new_rounded,
-                    color: AppColors.textDark,
-                  ),
-                ),
-              ),
               Center(
                 child: SingleChildScrollView(
                   padding: const EdgeInsets.all(24.0),
@@ -310,6 +297,18 @@ class _VolunteerLoginScreenState extends State<VolunteerLoginScreen> {
                               ),
                             ),
                     ],
+                  ),
+                ),
+              ),
+              // Back Button
+              Positioned(
+                top: 16,
+                left: 16,
+                child: IconButton(
+                  onPressed: () => Navigator.pop(context),
+                  icon: const Icon(
+                    Icons.arrow_back_ios_new_rounded,
+                    color: AppColors.textDark,
                   ),
                 ),
               ),

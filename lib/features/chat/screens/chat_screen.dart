@@ -24,11 +24,19 @@ class _ChatScreenState extends State<ChatScreen> {
   final TextEditingController _messageController = TextEditingController();
   final ScrollController _scrollController = ScrollController();
   final currentUser = FirebaseAuth.instance.currentUser;
+  late String chatId;
 
   @override
   void initState() {
     super.initState();
+    _initializeChatId();
     _markAsRead();
+  }
+
+  void _initializeChatId() {
+    final ids = [currentUser!.uid, widget.otherUserId];
+    ids.sort();
+    chatId = ids.join('_');
   }
 
   @override
@@ -46,11 +54,14 @@ class _ChatScreenState extends State<ChatScreen> {
       final batch = FirebaseFirestore.instance.batch();
 
       // 1. Mark notifications as read
+      // Note: Notifications might still be linked to requestId or just general.
+      // We will keep this as is for now, or update if notifications change structure.
+      // Assuming notifications are still per user.
       final notificationsQuery = await FirebaseFirestore.instance
           .collection('users')
           .doc(userId)
           .collection('notifications')
-          .where('requestId', isEqualTo: widget.requestId)
+          .where('senderId', isEqualTo: widget.otherUserId)
           .where('isRead', isEqualTo: false)
           .get();
 
@@ -58,10 +69,10 @@ class _ChatScreenState extends State<ChatScreen> {
         batch.update(doc.reference, {'isRead': true});
       }
 
-      // 2. Mark messages as read
+      // 2. Mark messages as read in the new collection
       final messagesQuery = await FirebaseFirestore.instance
-          .collection('requests')
-          .doc(widget.requestId)
+          .collection('chats')
+          .doc(chatId)
           .collection('messages')
           .where('receiverId', isEqualTo: userId)
           .where('isRead', isEqualTo: false)
@@ -84,23 +95,37 @@ class _ChatScreenState extends State<ChatScreen> {
     _messageController.clear();
 
     try {
-      await FirebaseFirestore.instance
-          .collection('requests')
-          .doc(widget.requestId)
-          .collection('messages')
-          .add({
-            'text': message,
-            'senderId': currentUser?.uid,
-            'receiverId': widget.otherUserId,
-            'createdAt': FieldValue.serverTimestamp(),
-            'isRead': false,
-          });
+      final batch = FirebaseFirestore.instance.batch();
+      final chatDocRef = FirebaseFirestore.instance
+          .collection('chats')
+          .doc(chatId);
+      final messageDocRef = chatDocRef.collection('messages').doc();
 
-      // Update request timestamp for sorting in chat list
-      await FirebaseFirestore.instance
-          .collection('requests')
-          .doc(widget.requestId)
-          .update({'updatedAt': FieldValue.serverTimestamp()});
+      // Add message
+      batch.set(messageDocRef, {
+        'text': message,
+        'senderId': currentUser?.uid,
+        'receiverId': widget.otherUserId,
+        'createdAt': FieldValue.serverTimestamp(),
+        'isRead': false,
+      });
+
+      // Update chat metadata
+      batch.set(chatDocRef, {
+        'participants': [currentUser?.uid, widget.otherUserId],
+        'lastMessage': message,
+        'lastMessageTime': FieldValue.serverTimestamp(),
+        'updatedAt': FieldValue.serverTimestamp(),
+        // We might want to store user names here for easier listing,
+        // but for now we can fetch them or rely on what we have.
+        // Let's store them to make ChatListScreen easier.
+        'userNames': {
+          currentUser?.uid: currentUser?.displayName ?? 'User',
+          widget.otherUserId: widget.otherUserName,
+        },
+      }, SetOptions(merge: true));
+
+      await batch.commit();
 
       // Scroll to bottom
       if (_scrollController.hasClients) {
@@ -166,8 +191,8 @@ class _ChatScreenState extends State<ChatScreen> {
           Expanded(
             child: StreamBuilder<QuerySnapshot>(
               stream: FirebaseFirestore.instance
-                  .collection('requests')
-                  .doc(widget.requestId)
+                  .collection('chats')
+                  .doc(chatId)
                   .collection('messages')
                   .orderBy('createdAt', descending: true)
                   .snapshots(),
