@@ -17,9 +17,11 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
   final _formKey = GlobalKey<FormState>();
   final _nameController = TextEditingController();
   final _phoneController = TextEditingController();
+  final _vehicleNumberController = TextEditingController();
   bool _isLoading = false;
   File? _imageFile;
   String? _currentPhotoURL;
+  String? _userRole;
 
   @override
   void initState() {
@@ -39,6 +41,9 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
         final data = doc.data();
         _nameController.text = data?['name'] ?? user.displayName ?? '';
         _phoneController.text = data?['phone'] ?? '';
+        _vehicleNumberController.text = data?['vehicleNumber'] ?? '';
+        _userRole = data?['role'];
+
         if (mounted) {
           setState(() {
             _currentPhotoURL = data?['photoURL'] ?? user.photoURL;
@@ -65,6 +70,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
   void dispose() {
     _nameController.dispose();
     _phoneController.dispose();
+    _vehicleNumberController.dispose();
     super.dispose();
   }
 
@@ -99,12 +105,21 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
         }
 
         // Update Firestore
-        await FirebaseFirestore.instance.collection('users').doc(user.uid).set({
+        final Map<String, dynamic> updateData = {
           'name': _nameController.text,
           'phone': _phoneController.text,
           'photoURL': photoURL,
           'updatedAt': FieldValue.serverTimestamp(),
-        }, SetOptions(merge: true));
+        };
+
+        if (_userRole == 'volunteer') {
+          updateData['vehicleNumber'] = _vehicleNumberController.text;
+        }
+
+        await FirebaseFirestore.instance
+            .collection('users')
+            .doc(user.uid)
+            .set(updateData, SetOptions(merge: true));
 
         // Reload user to ensure local auth state is fresh
         await user.reload();
@@ -212,6 +227,19 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                   ),
                 ),
               ),
+              if (_userRole == 'volunteer') ...[
+                const SizedBox(height: 16),
+                TextFormField(
+                  controller: _vehicleNumberController,
+                  decoration: InputDecoration(
+                    labelText: 'Vehicle Number',
+                    prefixIcon: const Icon(Icons.directions_car_outlined),
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                  ),
+                ),
+              ],
               const SizedBox(height: 32),
               SizedBox(
                 width: double.infinity,

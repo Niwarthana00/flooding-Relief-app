@@ -37,6 +37,7 @@ class RequestDetailScreen extends StatelessWidget {
     final volunteerName = requestData['volunteerName'];
     final volunteerPhone =
         requestData['volunteerPhone'] ?? '+94 77 123 4567'; // Mock if missing
+    final volunteerVehicleNumber = requestData['volunteerVehicleNumber'];
     final createdAt = requestData['createdAt'] as Timestamp?;
     final location = requestData['location'] as GeoPoint?;
 
@@ -81,6 +82,7 @@ class RequestDetailScreen extends StatelessWidget {
                 context,
                 volunteerName ?? 'Volunteer',
                 volunteerPhone,
+                vehicleNumber: volunteerVehicleNumber,
               ),
 
             if (volunteerName != null) const SizedBox(height: 16),
@@ -242,7 +244,12 @@ class RequestDetailScreen extends StatelessWidget {
     );
   }
 
-  Widget _buildVolunteerCard(BuildContext context, String name, String phone) {
+  Widget _buildVolunteerCard(
+    BuildContext context,
+    String name,
+    String phone, {
+    String? vehicleNumber,
+  }) {
     return Container(
       padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
@@ -278,29 +285,42 @@ class RequestDetailScreen extends StatelessWidget {
                 ),
               ),
               const SizedBox(width: 16),
-              Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    name,
-                    style: const TextStyle(
-                      fontWeight: FontWeight.bold,
-                      fontSize: 16,
-                      color: AppColors.textDark,
-                    ),
-                  ),
-                  InkWell(
-                    onTap: () => _launchCaller(phone),
-                    child: Text(
-                      phone,
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      name,
                       style: const TextStyle(
-                        color: AppColors.primaryBlue,
-                        fontSize: 14,
-                        decoration: TextDecoration.underline,
+                        fontWeight: FontWeight.bold,
+                        fontSize: 16,
+                        color: AppColors.textDark,
                       ),
                     ),
-                  ),
-                ],
+                    InkWell(
+                      onTap: () => _launchCaller(phone),
+                      child: Text(
+                        phone,
+                        style: const TextStyle(
+                          color: AppColors.primaryBlue,
+                          fontSize: 14,
+                          decoration: TextDecoration.underline,
+                        ),
+                      ),
+                    ),
+                    if (vehicleNumber != null && vehicleNumber.isNotEmpty) ...[
+                      const SizedBox(height: 4),
+                      Text(
+                        'Vehicle: $vehicleNumber',
+                        style: const TextStyle(
+                          color: Colors.grey,
+                          fontSize: 14,
+                          fontWeight: FontWeight.w500,
+                        ),
+                      ),
+                    ],
+                  ],
+                ),
               ),
             ],
           ),
@@ -550,6 +570,15 @@ class RequestDetailScreen extends StatelessWidget {
           try {
             final user = FirebaseAuth.instance.currentUser;
             if (user != null) {
+              // Fetch full user details to get vehicle number
+              final userDoc = await FirebaseFirestore.instance
+                  .collection('users')
+                  .doc(user.uid)
+                  .get();
+
+              final userData = userDoc.data();
+              final vehicleNumber = userData?['vehicleNumber'] ?? '';
+
               await FirebaseFirestore.instance
                   .collection('requests')
                   .doc(requestId)
@@ -558,7 +587,8 @@ class RequestDetailScreen extends StatelessWidget {
                     'volunteerId': user.uid,
                     'volunteerName': user.displayName ?? 'Volunteer',
                     'volunteerPhone':
-                        user.phoneNumber ?? '', // Or fetch from user doc
+                        user.phoneNumber ?? userData?['phone'] ?? '',
+                    'volunteerVehicleNumber': vehicleNumber,
                   });
               if (context.mounted) {
                 ScaffoldMessenger.of(context).showSnackBar(

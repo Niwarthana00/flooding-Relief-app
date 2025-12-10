@@ -18,6 +18,8 @@ class _VolunteerRegistrationScreenState
     extends State<VolunteerRegistrationScreen> {
   final _formKey = GlobalKey<FormState>();
   final TextEditingController _phoneController = TextEditingController();
+  final TextEditingController _vehicleNumberController =
+      TextEditingController();
 
   String? _selectedDistrict;
   String? _selectedVehicle;
@@ -67,6 +69,7 @@ class _VolunteerRegistrationScreenState
   @override
   void dispose() {
     _phoneController.dispose();
+    _vehicleNumberController.dispose();
     super.dispose();
   }
 
@@ -155,6 +158,7 @@ class _VolunteerRegistrationScreenState
         'phone': _phoneController.text.trim(),
         'district': _selectedDistrict,
         'vehicleType': _selectedVehicle,
+        'vehicleNumber': _vehicleNumberController.text.trim(),
         'role': 'volunteer',
         'location': _location,
         'createdAt': FieldValue.serverTimestamp(),
@@ -355,6 +359,39 @@ class _VolunteerRegistrationScreenState
                   ),
                 ),
                 const SizedBox(height: 20),
+
+                // Vehicle Number Field
+                if (_selectedVehicle != 'None' && _selectedVehicle != null) ...[
+                  const Text(
+                    'Vehicle Number',
+                    style: TextStyle(fontWeight: FontWeight.w600),
+                  ),
+                  const SizedBox(height: 8),
+                  TextFormField(
+                    controller: _vehicleNumberController,
+                    decoration: InputDecoration(
+                      hintText: 'Enter vehicle number (e.g. WP ABC-1234)',
+                      filled: true,
+                      fillColor: Colors.white,
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(12),
+                        borderSide: BorderSide.none,
+                      ),
+                      contentPadding: const EdgeInsets.symmetric(
+                        horizontal: 16,
+                        vertical: 14,
+                      ),
+                    ),
+                    validator: (value) {
+                      if (_selectedVehicle != 'None' &&
+                          (value == null || value.isEmpty)) {
+                        return 'Please enter vehicle number';
+                      }
+                      return null;
+                    },
+                  ),
+                  const SizedBox(height: 20),
+                ],
 
                 // Location Picker
                 const Text(

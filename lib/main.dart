@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:provider/provider.dart';
 import 'package:sahana/core/theme/app_colors.dart';
-import 'package:sahana/features/auth/screens/auth_wrapper.dart';
+
 import 'package:sahana/l10n/app_localizations.dart';
 import 'package:sahana/core/providers/locale_provider.dart';
 import 'package:sahana/core/services/notification_service.dart';
