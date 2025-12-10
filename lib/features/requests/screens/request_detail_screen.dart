@@ -70,7 +70,10 @@ class RequestDetailScreen extends StatelessWidget {
             // Volunteer Card (Only if assigned)
             // Contact Card
             if (FirebaseAuth.instance.currentUser?.uid ==
-                requestData['volunteerId'])
+                    requestData['volunteerId'] ||
+                (status.toLowerCase() == 'pending' &&
+                    FirebaseAuth.instance.currentUser?.uid !=
+                        requestData['userId']))
               _buildBeneficiaryContactCard(context)
             else if (volunteerName != null ||
                 [
@@ -339,6 +342,7 @@ class RequestDetailScreen extends StatelessWidget {
                           channelName: channelName,
                           otherUserName: name,
                           isOutgoing: true,
+                          receiverId: requestData['volunteerId'],
                         ),
                       ),
                     );
@@ -465,20 +469,13 @@ class RequestDetailScreen extends StatelessWidget {
                   onPressed: () {
                     // Start in-app voice call
                     final channelName = AgoraConfig.getChannelName(requestId);
-                    final currentUserId =
-                        FirebaseAuth.instance.currentUser?.uid;
-                    final receiverId =
-                        currentUserId == requestData['volunteerId']
-                        ? requestData['userId']
-                        : requestData['volunteerId'];
-
                     Navigator.push(
                       context,
                       MaterialPageRoute(
                         builder: (context) => VoiceCallScreen(
                           channelName: channelName,
                           otherUserName: name,
-                          receiverId: receiverId,
+                          receiverId: requestData['userId'],
                           isOutgoing: true,
                         ),
                       ),
