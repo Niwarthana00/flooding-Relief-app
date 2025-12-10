@@ -7,6 +7,7 @@ import 'package:sahana/l10n/app_localizations.dart';
 import 'package:sahana/core/providers/locale_provider.dart';
 import 'package:sahana/core/services/notification_service.dart';
 import 'package:sahana/features/calls/widgets/call_listener_wrapper.dart';
+import 'package:sahana/features/splash/screens/splash_screen.dart';
 
 final GlobalKey<NavigatorState> navigatorKey = GlobalKey<NavigatorState>();
 
@@ -52,7 +53,7 @@ class MyApp extends StatelessWidget {
               WidgetsBinding.instance.addPostFrameCallback((_) {
                 NotificationService.setContext(context);
               });
-              return const AuthWrapper();
+              return const SplashScreen();
             },
           ),
         );

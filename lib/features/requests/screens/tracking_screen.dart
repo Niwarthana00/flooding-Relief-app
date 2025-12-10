@@ -18,7 +18,7 @@ class TrackingScreen extends StatefulWidget {
 }
 
 class _TrackingScreenState extends State<TrackingScreen> {
-  GoogleMapController? _mapController;
+  // GoogleMapController? _mapController; // Removed unused controller
   BitmapDescriptor? _volunteerIcon;
   BitmapDescriptor? _destinationIcon;
 
@@ -104,9 +104,9 @@ class _TrackingScreenState extends State<TrackingScreen> {
           return GoogleMap(
             initialCameraPosition: CameraPosition(target: center, zoom: 14.0),
             markers: markers,
-            onMapCreated: (GoogleMapController controller) {
-              _mapController = controller;
-            },
+            // onMapCreated: (GoogleMapController controller) {
+            //   _mapController = controller;
+            // },
             myLocationEnabled: true,
             myLocationButtonEnabled: true,
           );

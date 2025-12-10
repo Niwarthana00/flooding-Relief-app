@@ -289,9 +289,16 @@ class RequestDetailScreen extends StatelessWidget {
                       color: AppColors.textDark,
                     ),
                   ),
-                  Text(
-                    phone,
-                    style: const TextStyle(color: Colors.grey, fontSize: 14),
+                  InkWell(
+                    onTap: () => _launchCaller(phone),
+                    child: Text(
+                      phone,
+                      style: const TextStyle(
+                        color: AppColors.primaryBlue,
+                        fontSize: 14,
+                        decoration: TextDecoration.underline,
+                      ),
+                    ),
                   ),
                 ],
               ),
@@ -415,9 +422,16 @@ class RequestDetailScreen extends StatelessWidget {
                     ),
                   ),
                   if (phone.isNotEmpty)
-                    Text(
-                      phone,
-                      style: const TextStyle(color: Colors.grey, fontSize: 14),
+                    InkWell(
+                      onTap: () => _launchCaller(phone),
+                      child: Text(
+                        phone,
+                        style: const TextStyle(
+                          color: AppColors.primaryBlue,
+                          fontSize: 14,
+                          decoration: TextDecoration.underline,
+                        ),
+                      ),
                     ),
                 ],
               ),

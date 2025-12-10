@@ -9,98 +9,115 @@ class RoleSelectionScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: AppColors.background,
-      body: SafeArea(
-        child: Center(
-          child: SingleChildScrollView(
-            padding: const EdgeInsets.symmetric(horizontal: 24.0),
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                // Logo Icon
-                Container(
-                  padding: const EdgeInsets.all(16),
-                  decoration: BoxDecoration(
+      body: Container(
+        decoration: const BoxDecoration(
+          gradient: LinearGradient(
+            begin: Alignment.topCenter,
+            end: Alignment.bottomCenter,
+            colors: [
+              Color(0xFFF0FDF4), // Very Light Green
+              Colors.white,
+            ],
+          ),
+        ),
+        child: SafeArea(
+          child: Center(
+            child: SingleChildScrollView(
+              padding: const EdgeInsets.symmetric(horizontal: 24.0),
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  // Logo Icon with Glow
+                  Container(
+                    padding: const EdgeInsets.all(24),
+                    decoration: BoxDecoration(
+                      color: Colors.white,
+                      shape: BoxShape.circle,
+                      boxShadow: [
+                        BoxShadow(
+                          color: AppColors.primaryGreen.withOpacity(0.2),
+                          blurRadius: 30,
+                          offset: const Offset(0, 10),
+                        ),
+                      ],
+                    ),
+                    child: const Icon(
+                      Icons.water_drop_rounded,
+                      size: 64,
+                      color: AppColors.primaryGreen,
+                    ),
+                  ),
+                  const SizedBox(height: 32),
+
+                  // Title
+                  const Text(
+                    'SAHANA',
+                    style: TextStyle(
+                      fontSize: 36,
+                      fontWeight: FontWeight.w900,
+                      color: AppColors.textDark,
+                      letterSpacing: 2,
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+
+                  // Subtitle
+                  const Text(
+                    'Flood Relief Assistance Platform',
+                    textAlign: TextAlign.center,
+                    style: TextStyle(
+                      fontSize: 16,
+                      color: AppColors.textLight,
+                      letterSpacing: 0.5,
+                    ),
+                  ),
+                  const SizedBox(height: 60),
+
+                  // Role Cards
+                  _RoleCard(
+                    title: 'I Need Help',
+                    subtitle: 'Request assistance for you and your family',
+                    icon: Icons.volunteer_activism_rounded,
                     color: AppColors.primaryGreen,
-                    borderRadius: BorderRadius.circular(20),
-                    boxShadow: [
-                      BoxShadow(
-                        color: AppColors.primaryGreen.withOpacity(0.3),
-                        blurRadius: 20,
-                        offset: const Offset(0, 10),
-                      ),
-                    ],
+                    onTap: () {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (context) => const BeneficiaryLoginScreen(),
+                        ),
+                      );
+                    },
                   ),
-                  child: const Icon(
-                    Icons.volunteer_activism_rounded,
-                    size: 48,
-                    color: Colors.white,
+                  const SizedBox(height: 20),
+
+                  _RoleCard(
+                    title: 'I Want to Help',
+                    subtitle: 'Volunteer to distribute relief items',
+                    icon: Icons.handshake_rounded,
+                    color: AppColors.primaryBlue,
+                    onTap: () {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (context) => const VolunteerLoginScreen(),
+                        ),
+                      );
+                    },
                   ),
-                ),
-                const SizedBox(height: 24),
 
-                // Title
-                const Text(
-                  'Relief Tracker',
-                  style: TextStyle(
-                    fontSize: 32,
-                    fontWeight: FontWeight.bold,
-                    color: AppColors.textDark,
-                    letterSpacing: -0.5,
+                  const SizedBox(height: 60),
+
+                  // Footer
+                  Text(
+                    'Together we can overcome any disaster',
+                    style: TextStyle(
+                      fontSize: 12,
+                      color: AppColors.textLight.withOpacity(0.6),
+                      fontStyle: FontStyle.italic,
+                    ),
                   ),
-                ),
-                const SizedBox(height: 8),
-
-                // Subtitle
-                const Text(
-                  'Select your role to continue',
-                  style: TextStyle(fontSize: 16, color: AppColors.textLight),
-                ),
-                const SizedBox(height: 48),
-
-                // Role Cards
-                _RoleCard(
-                  title: 'Beneficiary',
-                  subtitle: 'Request relief assistance',
-                  icon: Icons.inventory_2_rounded,
-                  color: AppColors.primaryGreen,
-                  onTap: () {
-                    Navigator.push(
-                      context,
-                      MaterialPageRoute(
-                        builder: (context) => const BeneficiaryLoginScreen(),
-                      ),
-                    );
-                  },
-                ),
-                const SizedBox(height: 16),
-
-                _RoleCard(
-                  title: 'Volunteer',
-                  subtitle: 'Deliver relief to those in need',
-                  icon: Icons.local_shipping_rounded,
-                  color: AppColors.primaryBlue,
-                  onTap: () {
-                    Navigator.push(
-                      context,
-                      MaterialPageRoute(
-                        builder: (context) => const VolunteerLoginScreen(),
-                      ),
-                    );
-                  },
-                ),
-
-                const SizedBox(height: 48),
-
-                // Footer
-                Text(
-                  'Demo app - Click any role to auto-fill credentials',
-                  style: TextStyle(
-                    fontSize: 12,
-                    color: AppColors.textLight.withOpacity(0.6),
-                  ),
-                ),
-              ],
+                ],
+              ),
             ),
           ),
         ),
@@ -126,61 +143,79 @@ class _RoleCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Material(
-      color: Colors.white,
-      borderRadius: BorderRadius.circular(16),
-      elevation: 2,
-      shadowColor: Colors.black.withOpacity(0.05),
-      child: InkWell(
-        onTap: onTap,
-        borderRadius: BorderRadius.circular(16),
-        child: Padding(
-          padding: const EdgeInsets.all(20.0),
-          child: Row(
-            children: [
-              // Icon Container
-              Container(
-                padding: const EdgeInsets.all(12),
-                decoration: BoxDecoration(
-                  color: color,
-                  borderRadius: BorderRadius.circular(12),
+    return Container(
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(24),
+        boxShadow: [
+          BoxShadow(
+            color: color.withOpacity(0.1),
+            blurRadius: 20,
+            offset: const Offset(0, 8),
+          ),
+        ],
+      ),
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          onTap: onTap,
+          borderRadius: BorderRadius.circular(24),
+          child: Padding(
+            padding: const EdgeInsets.all(24.0),
+            child: Row(
+              children: [
+                // Icon Container
+                Container(
+                  padding: const EdgeInsets.all(16),
+                  decoration: BoxDecoration(
+                    color: color.withOpacity(0.1),
+                    borderRadius: BorderRadius.circular(16),
+                  ),
+                  child: Icon(icon, color: color, size: 32),
                 ),
-                child: Icon(icon, color: Colors.white, size: 28),
-              ),
-              const SizedBox(width: 16),
+                const SizedBox(width: 20),
 
-              // Text Content
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      title,
-                      style: const TextStyle(
-                        fontSize: 18,
-                        fontWeight: FontWeight.bold,
-                        color: AppColors.textDark,
+                // Text Content
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        title,
+                        style: const TextStyle(
+                          fontSize: 20,
+                          fontWeight: FontWeight.bold,
+                          color: AppColors.textDark,
+                        ),
                       ),
-                    ),
-                    const SizedBox(height: 4),
-                    Text(
-                      subtitle,
-                      style: const TextStyle(
-                        fontSize: 14,
-                        color: AppColors.textLight,
+                      const SizedBox(height: 6),
+                      Text(
+                        subtitle,
+                        style: TextStyle(
+                          fontSize: 14,
+                          color: AppColors.textLight.withOpacity(0.8),
+                          height: 1.4,
+                        ),
                       ),
-                    ),
-                  ],
+                    ],
+                  ),
                 ),
-              ),
 
-              // Arrow
-              Icon(
-                Icons.arrow_forward_ios_rounded,
-                color: AppColors.textLight.withOpacity(0.5),
-                size: 18,
-              ),
-            ],
+                // Arrow
+                Container(
+                  padding: const EdgeInsets.all(8),
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    color: Colors.grey.shade50,
+                  ),
+                  child: Icon(
+                    Icons.arrow_forward_rounded,
+                    color: color,
+                    size: 20,
+                  ),
+                ),
+              ],
+            ),
           ),
         ),
       ),
