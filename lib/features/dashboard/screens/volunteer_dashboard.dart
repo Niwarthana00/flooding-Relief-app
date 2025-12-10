@@ -12,6 +12,7 @@ import 'package:provider/provider.dart';
 import 'package:sahana/core/providers/locale_provider.dart';
 import 'package:sahana/l10n/app_localizations.dart';
 import 'package:sahana/features/profile/screens/edit_profile_screen.dart';
+import 'package:sahana/features/profile/screens/settings_screen.dart';
 import 'package:sahana/features/notifications/screens/notification_screen.dart';
 import 'package:sahana/features/chat/screens/chat_list_screen.dart';
 
@@ -936,16 +937,15 @@ class _VolunteerDashboardState extends State<VolunteerDashboard> {
                         );
                       },
                     ),
-                    _buildProfileItem(
-                      Icons.settings_outlined,
-                      'Settings',
-                      () {},
-                    ),
-                    _buildProfileItem(
-                      Icons.help_outline,
-                      'Help & Support',
-                      () {},
-                    ),
+                    _buildProfileItem(Icons.settings_outlined, 'Settings', () {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (context) => const SettingsScreen(),
+                        ),
+                      );
+                    }),
+
                     const SizedBox(height: 24),
                     SizedBox(
                       width: double.infinity,
