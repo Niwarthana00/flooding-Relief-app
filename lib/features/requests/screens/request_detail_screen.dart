@@ -327,68 +327,65 @@ class RequestDetailScreen extends StatelessWidget {
               ),
             ],
           ),
-          const SizedBox(height: 20),
+          const SizedBox(height: 16),
           Row(
+            mainAxisAlignment: MainAxisAlignment.end,
             children: [
-              Expanded(
-                child: ElevatedButton.icon(
-                  onPressed: () {
-                    // Start in-app voice call
-                    final channelName = AgoraConfig.getChannelName(requestId);
-                    Navigator.push(
-                      context,
-                      MaterialPageRoute(
-                        builder: (context) => VoiceCallScreen(
-                          channelName: channelName,
-                          otherUserName: name,
-                          isOutgoing: true,
-                          receiverId: requestData['volunteerId'],
-                        ),
+              _buildContactIcon(
+                icon: Icons.call,
+                color: Colors.green,
+                onTap: () {
+                  final channelName = AgoraConfig.getChannelName(requestId);
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (context) => VoiceCallScreen(
+                        channelName: channelName,
+                        otherUserName: name,
+                        isOutgoing: true,
+                        receiverId: requestData['volunteerId'],
                       ),
-                    );
-                  },
-                  icon: const Icon(Icons.call, size: 18),
-                  label: const Text('Voice Call'),
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: AppColors.primaryBlue,
-                    foregroundColor: Colors.white,
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(8),
                     ),
-                    padding: const EdgeInsets.symmetric(vertical: 12),
-                  ),
-                ),
+                  );
+                },
               ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: ElevatedButton.icon(
-                  onPressed: () {
-                    Navigator.push(
-                      context,
-                      MaterialPageRoute(
-                        builder: (context) => ChatScreen(
-                          requestId: requestId,
-                          otherUserName: name,
-                          otherUserId: requestData['volunteerId'],
-                        ),
+              const SizedBox(width: 16),
+              _buildContactIcon(
+                icon: Icons.chat_bubble_outline,
+                color: Colors.blue,
+                onTap: () {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (context) => ChatScreen(
+                        requestId: requestId,
+                        otherUserName: name,
+                        otherUserId: requestData['volunteerId'],
                       ),
-                    );
-                  },
-                  icon: const Icon(Icons.chat_bubble_outline, size: 18),
-                  label: const Text('Chat'),
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: const Color(0xFF2563EB),
-                    foregroundColor: Colors.white,
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(8),
                     ),
-                    padding: const EdgeInsets.symmetric(vertical: 12),
-                  ),
-                ),
+                  );
+                },
               ),
             ],
           ),
         ],
+      ),
+    );
+  }
+
+  Widget _buildContactIcon({
+    required IconData icon,
+    required Color color,
+    required VoidCallback onTap,
+  }) {
+    return Container(
+      decoration: BoxDecoration(
+        color: color.withOpacity(0.1),
+        shape: BoxShape.circle,
+      ),
+      child: IconButton(
+        onPressed: onTap,
+        icon: Icon(icon, color: color),
       ),
     );
   }
@@ -461,64 +458,44 @@ class RequestDetailScreen extends StatelessWidget {
               ),
             ],
           ),
-          const SizedBox(height: 20),
+          const SizedBox(height: 16),
           Row(
+            mainAxisAlignment: MainAxisAlignment.end,
             children: [
-              Expanded(
-                child: ElevatedButton.icon(
-                  onPressed: () {
-                    // Start in-app voice call
-                    final channelName = AgoraConfig.getChannelName(requestId);
-                    Navigator.push(
-                      context,
-                      MaterialPageRoute(
-                        builder: (context) => VoiceCallScreen(
-                          channelName: channelName,
-                          otherUserName: name,
-                          receiverId: requestData['userId'],
-                          isOutgoing: true,
-                        ),
+              _buildContactIcon(
+                icon: Icons.call,
+                color: Colors.green,
+                onTap: () {
+                  final channelName = AgoraConfig.getChannelName(requestId);
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (context) => VoiceCallScreen(
+                        channelName: channelName,
+                        otherUserName: name,
+                        receiverId: requestData['userId'],
+                        isOutgoing: true,
                       ),
-                    );
-                  },
-                  icon: const Icon(Icons.call, size: 18),
-                  label: const Text('Voice Call'),
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: AppColors.primaryBlue,
-                    foregroundColor: Colors.white,
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(8),
                     ),
-                    padding: const EdgeInsets.symmetric(vertical: 12),
-                  ),
-                ),
+                  );
+                },
               ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: ElevatedButton.icon(
-                  onPressed: () {
-                    Navigator.push(
-                      context,
-                      MaterialPageRoute(
-                        builder: (context) => ChatScreen(
-                          requestId: requestId,
-                          otherUserName: name,
-                          otherUserId: requestData['userId'],
-                        ),
+              const SizedBox(width: 16),
+              _buildContactIcon(
+                icon: Icons.chat_bubble_outline,
+                color: Colors.blue,
+                onTap: () {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (context) => ChatScreen(
+                        requestId: requestId,
+                        otherUserName: name,
+                        otherUserId: requestData['userId'],
                       ),
-                    );
-                  },
-                  icon: const Icon(Icons.chat_bubble_outline, size: 18),
-                  label: const Text('Chat'),
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: const Color(0xFF2563EB),
-                    foregroundColor: Colors.white,
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(8),
                     ),
-                    padding: const EdgeInsets.symmetric(vertical: 12),
-                  ),
-                ),
+                  );
+                },
               ),
             ],
           ),
