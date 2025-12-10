@@ -71,28 +71,16 @@ class NotificationScreen extends StatelessWidget {
           // Group notifications
           final docs = snapshot.data!.docs;
           final List<QueryDocumentSnapshot> uniqueDocs = [];
-          final Set<String> processedSenders = {};
 
           for (var doc in docs) {
             final data = doc.data() as Map<String, dynamic>;
-            // Only group unread chat notifications or all?
-            // User said "messages dammahama", implying unread.
-            // But if they are read, maybe we want to see history?
-            // Usually notification center shows latest per conversation.
-            // Let's group all chat notifications from same sender.
+
+            // Skip chat notifications as they are shown in the messages screen
             if (data['type'] == 'chat') {
-              final senderId = data['senderId'];
-              if (senderId != null) {
-                if (!processedSenders.contains(senderId)) {
-                  processedSenders.add(senderId);
-                  uniqueDocs.add(doc);
-                }
-              } else {
-                uniqueDocs.add(doc);
-              }
-            } else {
-              uniqueDocs.add(doc);
+              continue;
             }
+
+            uniqueDocs.add(doc);
           }
 
           return ListView.separated(

@@ -40,6 +40,31 @@ class _VolunteerLoginScreenState extends State<VolunteerLoginScreen> {
             );
 
             if (userDoc.exists) {
+              final userData = userDoc.data();
+              final role = userData?['role'];
+
+              if (role == 'beneficiary') {
+                await _authService.signOut();
+                if (mounted) {
+                  showDialog(
+                    context: context,
+                    builder: (context) => AlertDialog(
+                      title: const Text('Wrong Portal'),
+                      content: const Text(
+                        'You are registered as a Beneficiary. Please log in using the Beneficiary portal.',
+                      ),
+                      actions: [
+                        TextButton(
+                          onPressed: () => Navigator.pop(context),
+                          child: const Text('OK'),
+                        ),
+                      ],
+                    ),
+                  );
+                }
+                return;
+              }
+
               // User exists, save token and go to Dashboard
               await NotificationService().initialize();
 

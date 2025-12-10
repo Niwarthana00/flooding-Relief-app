@@ -13,6 +13,7 @@ import 'package:sahana/core/providers/locale_provider.dart';
 import 'package:sahana/l10n/app_localizations.dart';
 import 'package:sahana/features/profile/screens/edit_profile_screen.dart';
 import 'package:sahana/features/notifications/screens/notification_screen.dart';
+import 'package:sahana/features/chat/screens/chat_list_screen.dart';
 
 class BeneficiaryDashboard extends StatefulWidget {
   const BeneficiaryDashboard({super.key});
@@ -440,108 +441,132 @@ class _HomeTabState extends State<_HomeTab> {
                                   .where('isRead', isEqualTo: false)
                                   .snapshots(),
                               builder: (context, snapshot) {
-                                int unreadCount = 0;
+                                int chatCount = 0;
+                                int otherCount = 0;
+
                                 if (snapshot.hasData) {
                                   final docs = snapshot.data!.docs;
-                                  final chatNotifications = docs.where((doc) {
+                                  chatCount = docs.where((doc) {
                                     final data =
                                         doc.data() as Map<String, dynamic>;
                                     return data['type'] == 'chat';
-                                  });
-                                  final otherNotifications = docs.where((doc) {
+                                  }).length;
+                                  otherCount = docs.where((doc) {
                                     final data =
                                         doc.data() as Map<String, dynamic>;
                                     return data['type'] != 'chat';
-                                  });
-
-                                  final uniqueChatSenders = chatNotifications
-                                      .map((doc) {
-                                        final data =
-                                            doc.data() as Map<String, dynamic>;
-                                        return data['senderId'];
-                                      })
-                                      .toSet();
-
-                                  unreadCount =
-                                      uniqueChatSenders.length +
-                                      otherNotifications.length;
+                                  }).length;
                                 }
 
-                                return Stack(
+                                return Row(
+                                  mainAxisSize: MainAxisSize.min,
                                   children: [
-                                    IconButton(
-                                      onPressed: () {
-                                        Navigator.push(
-                                          context,
-                                          MaterialPageRoute(
-                                            builder: (context) =>
-                                                const NotificationScreen(),
+                                    // Message Icon
+                                    Stack(
+                                      children: [
+                                        IconButton(
+                                          onPressed: () {
+                                            Navigator.push(
+                                              context,
+                                              MaterialPageRoute(
+                                                builder: (context) =>
+                                                    const ChatListScreen(),
+                                              ),
+                                            );
+                                          },
+                                          icon: const Icon(
+                                            Icons.chat_bubble_outline_rounded,
+                                            color: Colors.white,
                                           ),
-                                        );
-                                      },
-                                      icon: const Icon(
-                                        Icons.notifications_outlined,
-                                        color: Colors.white,
-                                      ),
-                                      style: IconButton.styleFrom(
-                                        backgroundColor: Colors.white24,
-                                        shape: const CircleBorder(),
-                                      ),
-                                    ),
-                                    if (unreadCount > 0)
-                                      Positioned(
-                                        right: 8,
-                                        top: 8,
-                                        child: Container(
-                                          padding: const EdgeInsets.all(4),
-                                          decoration: const BoxDecoration(
-                                            color: Colors.red,
-                                            shape: BoxShape.circle,
-                                          ),
-                                          constraints: const BoxConstraints(
-                                            minWidth: 16,
-                                            minHeight: 16,
-                                          ),
-                                          child: Text(
-                                            unreadCount > 9
-                                                ? '9+'
-                                                : unreadCount.toString(),
-                                            style: const TextStyle(
-                                              color: Colors.white,
-                                              fontSize: 10,
-                                              fontWeight: FontWeight.bold,
-                                            ),
-                                            textAlign: TextAlign.center,
+                                          style: IconButton.styleFrom(
+                                            backgroundColor: Colors.white24,
+                                            shape: const CircleBorder(),
                                           ),
                                         ),
-                                      ),
+                                        if (chatCount > 0)
+                                          Positioned(
+                                            right: 8,
+                                            top: 8,
+                                            child: Container(
+                                              padding: const EdgeInsets.all(4),
+                                              decoration: const BoxDecoration(
+                                                color: Colors.red,
+                                                shape: BoxShape.circle,
+                                              ),
+                                              constraints: const BoxConstraints(
+                                                minWidth: 16,
+                                                minHeight: 16,
+                                              ),
+                                              child: Text(
+                                                chatCount > 9
+                                                    ? '9+'
+                                                    : chatCount.toString(),
+                                                style: const TextStyle(
+                                                  color: Colors.white,
+                                                  fontSize: 10,
+                                                  fontWeight: FontWeight.bold,
+                                                ),
+                                                textAlign: TextAlign.center,
+                                              ),
+                                            ),
+                                          ),
+                                      ],
+                                    ),
+                                    const SizedBox(width: 8),
+                                    // Notification Icon
+                                    Stack(
+                                      children: [
+                                        IconButton(
+                                          onPressed: () {
+                                            Navigator.push(
+                                              context,
+                                              MaterialPageRoute(
+                                                builder: (context) =>
+                                                    const NotificationScreen(),
+                                              ),
+                                            );
+                                          },
+                                          icon: const Icon(
+                                            Icons.notifications_outlined,
+                                            color: Colors.white,
+                                          ),
+                                          style: IconButton.styleFrom(
+                                            backgroundColor: Colors.white24,
+                                            shape: const CircleBorder(),
+                                          ),
+                                        ),
+                                        if (otherCount > 0)
+                                          Positioned(
+                                            right: 8,
+                                            top: 8,
+                                            child: Container(
+                                              padding: const EdgeInsets.all(4),
+                                              decoration: const BoxDecoration(
+                                                color: Colors.red,
+                                                shape: BoxShape.circle,
+                                              ),
+                                              constraints: const BoxConstraints(
+                                                minWidth: 16,
+                                                minHeight: 16,
+                                              ),
+                                              child: Text(
+                                                otherCount > 9
+                                                    ? '9+'
+                                                    : otherCount.toString(),
+                                                style: const TextStyle(
+                                                  color: Colors.white,
+                                                  fontSize: 10,
+                                                  fontWeight: FontWeight.bold,
+                                                ),
+                                                textAlign: TextAlign.center,
+                                              ),
+                                            ),
+                                          ),
+                                      ],
+                                    ),
                                   ],
                                 );
                               },
-                            ),
-
-                            IconButton(
-                              onPressed: () async {
-                                await AuthService().signOut();
-                                if (context.mounted) {
-                                  Navigator.pushAndRemoveUntil(
-                                    context,
-                                    MaterialPageRoute(
-                                      builder: (_) =>
-                                          const RoleSelectionScreen(),
-                                    ),
-                                    (route) => false,
-                                  );
-                                }
-                              },
-                              icon: const Icon(
-                                Icons.logout_rounded,
-                                color: Colors.white,
-                              ),
-                              style: IconButton.styleFrom(
-                                backgroundColor: Colors.white24,
-                                shape: const CircleBorder(),
-                              ),
                             ),
                           ],
                         ),

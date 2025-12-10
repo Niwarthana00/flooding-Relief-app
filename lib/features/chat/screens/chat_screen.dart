@@ -26,10 +26,55 @@ class _ChatScreenState extends State<ChatScreen> {
   final currentUser = FirebaseAuth.instance.currentUser;
 
   @override
+  void initState() {
+    super.initState();
+    _markAsRead();
+  }
+
+  @override
   void dispose() {
     _messageController.dispose();
     _scrollController.dispose();
     super.dispose();
+  }
+
+  Future<void> _markAsRead() async {
+    final userId = FirebaseAuth.instance.currentUser?.uid;
+    if (userId == null) return;
+
+    try {
+      final batch = FirebaseFirestore.instance.batch();
+
+      // 1. Mark notifications as read
+      final notificationsQuery = await FirebaseFirestore.instance
+          .collection('users')
+          .doc(userId)
+          .collection('notifications')
+          .where('requestId', isEqualTo: widget.requestId)
+          .where('isRead', isEqualTo: false)
+          .get();
+
+      for (var doc in notificationsQuery.docs) {
+        batch.update(doc.reference, {'isRead': true});
+      }
+
+      // 2. Mark messages as read
+      final messagesQuery = await FirebaseFirestore.instance
+          .collection('requests')
+          .doc(widget.requestId)
+          .collection('messages')
+          .where('receiverId', isEqualTo: userId)
+          .where('isRead', isEqualTo: false)
+          .get();
+
+      for (var doc in messagesQuery.docs) {
+        batch.update(doc.reference, {'isRead': true});
+      }
+
+      await batch.commit();
+    } catch (e) {
+      debugPrint('Error marking as read: $e');
+    }
   }
 
   void _sendMessage() async {
@@ -50,6 +95,12 @@ class _ChatScreenState extends State<ChatScreen> {
             'createdAt': FieldValue.serverTimestamp(),
             'isRead': false,
           });
+
+      // Update request timestamp for sorting in chat list
+      await FirebaseFirestore.instance
+          .collection('requests')
+          .doc(widget.requestId)
+          .update({'updatedAt': FieldValue.serverTimestamp()});
 
       // Scroll to bottom
       if (_scrollController.hasClients) {
